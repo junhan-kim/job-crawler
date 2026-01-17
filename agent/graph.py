@@ -1,5 +1,6 @@
 """에이전트 워크플로우 정의."""
 
+import time
 from enum import StrEnum
 
 from langgraph.graph import END, StateGraph
@@ -40,6 +41,8 @@ graph = create_graph()
 
 async def run_agent(query: str) -> dict:
     """에이전트 실행."""
+    start_time = time.perf_counter()
+
     initial_state = {
         "query": query,
         "parsed_conditions": None,
@@ -57,6 +60,7 @@ async def run_agent(query: str) -> dict:
         raise AgentError("Failed to generate LLM response")
 
     final_results = result.get("final_results") or []
+    elapsed_ms = int((time.perf_counter() - start_time) * 1000)
 
     return {
         "query": query,
@@ -64,4 +68,5 @@ async def run_agent(query: str) -> dict:
         "response": response,
         "results": final_results,
         "total_count": len(final_results),
+        "search_time_ms": elapsed_ms,
     }

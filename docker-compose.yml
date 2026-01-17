@@ -8,6 +8,9 @@ services:
     environment:
       - DEBUG=True
       - OLLAMA_HOST=http://ollama:11434
+    security_opt:
+      - seccomp:unconfined
+    shm_size: '2gb'
     depends_on:
       ollama:
         condition: service_healthy

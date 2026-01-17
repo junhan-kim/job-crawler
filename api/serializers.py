@@ -14,6 +14,7 @@ class ResponseField:
     RESPONSE = "response"
     RESULTS = "results"
     TOTAL_COUNT = "total_count"
+    SEARCH_TIME_MS = "search_time_ms"
 
 
 class SearchRequestSerializer(serializers.Serializer):
@@ -60,3 +61,4 @@ class SearchResponseSerializer(serializers.Serializer):
     response = serializers.CharField()
     results = JobPostingSerializer(many=True)
     total_count = serializers.IntegerField()
+    search_time_ms = serializers.IntegerField()

@@ -31,11 +31,36 @@ LLM 기반 채용 정보 검색 에이전트
 ## Quick Start
 
 ```bash
-# 개발 환경 실행
 docker-compose up -d
+```
 
-# 웹 접속
 http://localhost:8000
+
+---
+
+## 테스트
+
+```bash
+# 의존성 설치
+pip install -r requirements.txt
+
+# 테스트 실행
+pytest
+```
+
+---
+
+## 프로젝트 구조
+
+```
+job-crawler/
+├── agent/              # LangGraph 에이전트 (nodes, graph)
+├── api/                # Django REST Framework API
+├── crawlers/           # Playwright 크롤러 (사람인 등)
+├── config/             # Django 설정
+├── templates/          # 웹 UI 템플릿
+├── tests/              # 테스트
+└── docs/               # 문서
 ```
 
 ---
