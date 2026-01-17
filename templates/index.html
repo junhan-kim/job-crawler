@@ -7,16 +7,43 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; min-height: 100vh; padding: 40px 20px; }
-        .container { max-width: 600px; margin: 0 auto; }
+        .container { max-width: 800px; margin: 0 auto; }
         h1 { text-align: center; margin-bottom: 30px; color: #333; }
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
         input[type="text"] { flex: 1; padding: 12px 16px; font-size: 16px; border: 1px solid #ddd; border-radius: 8px; }
         button { padding: 12px 24px; font-size: 16px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; }
         button:hover { background: #1d4ed8; }
         button:disabled { background: #9ca3af; cursor: not-allowed; }
-        .result { background: white; border-radius: 8px; padding: 20px; white-space: pre-wrap; line-height: 1.6; }
-        .error { background: #fef2f2; color: #dc2626; }
-        .parsed { margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; font-size: 14px; color: #666; }
+
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .loading-spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #ddd; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .response-box { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; line-height: 1.6; }
+        .response-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .response-header h2 { font-size: 18px; color: #333; }
+        .result-count { font-size: 14px; color: #666; }
+
+        .job-list { display: flex; flex-direction: column; gap: 12px; }
+        .job-card { background: white; border-radius: 8px; padding: 16px; border: 1px solid #e5e7eb; transition: box-shadow 0.2s; }
+        .job-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .job-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .job-title { font-size: 16px; font-weight: 600; color: #1f2937; text-decoration: none; }
+        .job-title:hover { color: #2563eb; }
+        .job-source { font-size: 12px; padding: 2px 8px; background: #f3f4f6; border-radius: 4px; color: #6b7280; }
+        .job-company { font-size: 14px; color: #4b5563; margin-bottom: 8px; }
+        .job-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; color: #6b7280; }
+        .job-meta span { display: flex; align-items: center; gap: 4px; }
+        .job-skills { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .skill-tag { font-size: 12px; padding: 2px 8px; background: #eff6ff; color: #2563eb; border-radius: 4px; }
+
+        .parsed-info { background: #f9fafb; border-radius: 8px; padding: 16px; margin-top: 20px; }
+        .parsed-info h3 { font-size: 14px; color: #6b7280; margin-bottom: 10px; }
+        .parsed-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+        .parsed-tag { font-size: 13px; padding: 4px 10px; background: white; border: 1px solid #e5e7eb; border-radius: 4px; }
+
+        .error { background: #fef2f2; color: #dc2626; border-radius: 8px; padding: 20px; }
+        .empty-state { text-align: center; padding: 40px; color: #6b7280; }
     </style>
 </head>
 <body>
@@ -33,13 +60,82 @@
         const searchBtn = document.getElementById('search');
         const resultDiv = document.getElementById('result');
 
+        function renderLoading() {
+            return '<div class="loading"><span class="loading-spinner"></span>채용 공고를 검색하고 있습니다...</div>';
+        }
+
+        function renderError(message) {
+            return `<div class="error">${escapeHtml(message)}</div>`;
+        }
+
+        function renderJobCard(job) {
+            const skills = (job.skills || []).map(s => `<span class="skill-tag">${escapeHtml(s)}</span>`).join('');
+            return `
+                <div class="job-card">
+                    <div class="job-card-header">
+                        <a href="${escapeHtml(job.url)}" target="_blank" class="job-title">${escapeHtml(job.title)}</a>
+                        <span class="job-source">${escapeHtml(job.source)}</span>
+                    </div>
+                    <div class="job-company">${escapeHtml(job.company)}</div>
+                    <div class="job-meta">
+                        ${job.location ? `<span>${escapeHtml(job.location)}</span>` : ''}
+                        ${job.experience ? `<span>${escapeHtml(job.experience)}</span>` : ''}
+                        ${job.deadline ? `<span>${escapeHtml(job.deadline)}</span>` : ''}
+                    </div>
+                    ${skills ? `<div class="job-skills">${skills}</div>` : ''}
+                </div>
+            `;
+        }
+
+        function renderParsedConditions(parsed) {
+            if (!parsed) return '';
+            const tags = [];
+            if (parsed.role) tags.push(`직무: ${parsed.role}`);
+            if (parsed.experience) tags.push(`경력: ${parsed.experience}년`);
+            if (parsed.location) tags.push(`지역: ${parsed.location}`);
+            if (parsed.skills?.length) tags.push(`기술: ${parsed.skills.join(', ')}`);
+            if (tags.length === 0) return '';
+            return `
+                <div class="parsed-info">
+                    <h3>검색 조건</h3>
+                    <div class="parsed-tags">
+                        ${tags.map(t => `<span class="parsed-tag">${escapeHtml(t)}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderResults(data) {
+            const jobs = data.results || [];
+            let html = `
+                <div class="response-box">
+                    <div class="response-header">
+                        <h2>검색 결과</h2>
+                        <span class="result-count">${data.total_count}건</span>
+                    </div>
+                    <div>${escapeHtml(data.response)}</div>
+                    ${renderParsedConditions(data.parsed_conditions)}
+                </div>
+            `;
+            if (jobs.length > 0) {
+                html += `<div class="job-list">${jobs.map(renderJobCard).join('')}</div>`;
+            } else {
+                html += '<div class="empty-state">검색 결과가 없습니다.</div>';
+            }
+            return html;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
         async function search() {
             const query = queryInput.value.trim();
             if (!query) return;
 
             searchBtn.disabled = true;
-            resultDiv.className = 'result';
-            resultDiv.textContent = '검색 중...';
+            resultDiv.innerHTML = renderLoading();
 
             try {
                 const res = await fetch('/api/search/', {
@@ -50,15 +146,12 @@
                 const data = await res.json();
 
                 if (data.error) {
-                    resultDiv.className = 'result error';
-                    resultDiv.textContent = data.error;
+                    resultDiv.innerHTML = renderError(data.error);
                 } else {
-                    resultDiv.innerHTML = data.response +
-                        '<div class="parsed">파싱 결과: ' + JSON.stringify(data.parsed, null, 2) + '</div>';
+                    resultDiv.innerHTML = renderResults(data);
                 }
             } catch (e) {
-                resultDiv.className = 'result error';
-                resultDiv.textContent = '요청 실패: ' + e.message;
+                resultDiv.innerHTML = renderError('요청 실패: ' + e.message);
             } finally {
                 searchBtn.disabled = false;
             }

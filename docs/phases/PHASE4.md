@@ -229,10 +229,159 @@
 
 ---
 
-### P4-5: SSE 스트리밍 API 구현
+### P4-5: LLM 기반 검색 재시도 (LangGraph 조건부 분기)
+
+**설명**
+검색 결과가 부족할 때 LLM이 키워드를 확장하여 자동 재검색한다.
+LangGraph의 조건부 엣지를 활용하여 LLM이 흐름을 결정하는 첫 번째 기능.
+
+**워크플로우**
+```
+parse → plan → execute → evaluate ─┬─ 결과 충분 → synthesize → END
+                    ↑              │
+                    └── 결과 부족 ──┘
+                       (LLM 키워드 확장)
+```
+
+**작업 내용**
+- [ ] `agent/nodes/evaluate.py` 작성
+  ```python
+  MIN_RESULTS_THRESHOLD = 3
+  MAX_RETRY_COUNT = 2
+
+  async def evaluate_node(state: AgentState) -> dict:
+      """
+      검색 결과를 평가하고 재검색 필요 여부 결정.
+
+      Input: crawl_results, retry_count
+      Output: should_retry, retry_count, expanded_keywords
+      """
+      results = state["crawl_results"] or []
+      retry_count = state.get("retry_count", 0)
+
+      if len(results) >= MIN_RESULTS_THRESHOLD:
+          return {"should_retry": False}
+
+      if retry_count >= MAX_RETRY_COUNT:
+          logger.info("Max retry reached, proceeding with current results")
+          return {"should_retry": False}
+
+      # LLM에게 키워드 확장 요청
+      expanded = await _expand_keywords_with_llm(state)
+
+      return {
+          "should_retry": True,
+          "retry_count": retry_count + 1,
+          "expanded_keywords": expanded,
+      }
+  ```
+- [ ] LLM 키워드 확장 함수
+  ```python
+  async def _expand_keywords_with_llm(state: AgentState) -> list[str]:
+      """LLM이 검색 키워드를 확장."""
+      original_keywords = state["search_plan"]["keywords"]
+      conditions = state["parsed_conditions"]
+
+      prompt = f"""
+      검색 결과가 부족합니다.
+      원래 키워드: {original_keywords}
+      검색 조건: {conditions}
+
+      더 많은 결과를 찾기 위해 키워드를 확장해주세요.
+      - 동의어, 유사 직무명 추가
+      - 기술 스택의 다른 표현 추가
+
+      JSON 형식으로 응답:
+      {{"expanded_keywords": ["키워드1", "키워드2", ...]}}
+      """
+
+      llm = OllamaProvider()
+      response = await llm.chat(prompt)
+      data = json.loads(response.content)
+      return data["expanded_keywords"]
+  ```
+- [ ] `agent/graph.py` 수정 (조건부 엣지 추가)
+  ```python
+  from langgraph.graph import StateGraph, END
+
+  def should_retry(state: AgentState) -> str:
+      """재검색 여부 결정."""
+      if state.get("should_retry"):
+          return "plan"  # plan 노드로 돌아가서 재검색
+      return "synthesize"
+
+  def create_graph():
+      workflow = StateGraph(AgentState)
+
+      workflow.add_node("parse", parse_node)
+      workflow.add_node("plan", plan_node)
+      workflow.add_node("execute", execute_node)
+      workflow.add_node("evaluate", evaluate_node)  # 새 노드
+      workflow.add_node("synthesize", synthesize_node)
+
+      workflow.add_edge("parse", "plan")
+      workflow.add_edge("plan", "execute")
+      workflow.add_edge("execute", "evaluate")
+
+      # 조건부 분기: LangGraph의 핵심 기능
+      workflow.add_conditional_edges(
+          "evaluate",
+          should_retry,
+          {"plan": "plan", "synthesize": "synthesize"}
+      )
+
+      workflow.add_edge("synthesize", END)
+      workflow.set_entry_point("parse")
+
+      return workflow.compile()
+  ```
+- [ ] `AgentState`에 필드 추가
+  ```python
+  class AgentState(TypedDict):
+      # 기존 필드...
+      retry_count: int | None
+      should_retry: bool | None
+      expanded_keywords: list[str] | None
+  ```
+- [ ] `plan_node` 수정 (확장 키워드 사용)
+  ```python
+  async def plan_node(state: AgentState) -> dict:
+      # 재시도 시 확장 키워드 사용
+      if state.get("expanded_keywords"):
+          keywords = state["expanded_keywords"]
+      else:
+          keywords = _build_keywords(conditions)
+      # ...
+  ```
+
+**완료 기준**
+- 결과 3건 미만 시 LLM이 키워드 확장
+- 최대 2회 재시도 후 기존 결과로 진행
+- SSE로 "재검색 중..." 상태 전달
+- 로그에서 재시도 흐름 확인 가능
+
+**예시 시나리오**
+```
+[입력] "Rust 시스템 프로그래머"
+[1차 검색] 키워드: "Rust 시스템 프로그래머" → 1건
+[LLM 판단] 결과 부족, 키워드 확장 필요
+[LLM 확장] ["Rust", "시스템 개발자", "임베디드", "C++"]
+[2차 검색] 키워드: "Rust 시스템 개발자 임베디드" → 8건
+[완료] 8건 반환
+```
+
+**의의**
+- LangGraph의 조건부 분기를 실제로 활용
+- LLM이 워크플로우 흐름을 결정하는 첫 사례
+- 단순 파이프라인에서 "에이전트"로 진화
+
+---
+
+### P4-6: SSE 스트리밍 API 구현
 
 **설명**
 Server-Sent Events를 사용하여 검색 진행 상황을 실시간으로 전달한다.
+재검색 시에도 "키워드 확장 중...", "재검색 중..." 이벤트 전달.
 
 **작업 내용**
 - [ ] `apps/search/views.py`에 SSE 뷰 추가
@@ -504,13 +653,14 @@ Server-Sent Events를 사용하여 검색 진행 상황을 실시간으로 전�
 [ ] P4-2: 잡코리아 크롤러 구현
 [ ] P4-3: 크롤러 팩토리 및 통합
 [ ] P4-4: 병렬 크롤링 구현
-[ ] P4-5: SSE 스트리밍 API 구현
-[ ] P4-6: SSE 클라이언트 구현
-[ ] P4-7: 소스별 필터 UI
-[ ] P4-8: 진행 상황 UI 개선
-[ ] P4-9: 통합 테스트 및 안정화
+[ ] P4-5: LLM 기반 검색 재시도 (LangGraph 조건부 분기) ⭐
+[ ] P4-6: SSE 스트리밍 API 구현
+[ ] P4-7: SSE 클라이언트 구현
+[ ] P4-8: 소스별 필터 UI
+[ ] P4-9: 진행 상황 UI 개선
+[ ] P4-10: 통합 테스트 및 안정화
 ────────────────────────────────────────
-✅ 데모: 3개 사이트 동시 검색 + 실시간 표시
+✅ 데모: 3개 사이트 동시 검색 + 실시간 표시 + 스마트 재검색
 ```
 
 ---
@@ -524,3 +674,6 @@ Server-Sent Events를 사용하여 검색 진행 상황을 실시간으로 전�
 | 병렬 크롤링 메모리 | 브라우저 인스턴스 공유, 순차 실행 fallback |
 | 일부 크롤러만 느림 | 개별 타임아웃, 빠른 것 먼저 표시 |
 | nginx 버퍼링 | X-Accel-Buffering: no 헤더 |
+| LLM 키워드 확장 실패 | fallback: 원래 키워드로 진행, JSON 파싱 에러 처리 |
+| 무한 재시도 루프 | MAX_RETRY_COUNT 제한, 이전 키워드와 동일하면 중단 |
+| 재검색 시간 초과 | 전체 타임아웃 + 재시도 횟수 기반 시간 제한 |

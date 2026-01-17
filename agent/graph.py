@@ -1,52 +1,36 @@
-import json
+"""에이전트 워크플로우 정의."""
+
 from enum import StrEnum
-from typing import TypedDict
 from langgraph.graph import StateGraph, END
-from llm import OllamaProvider
-from .models import ParsedQuery
-from .formatter import ResponseFormatter
-from .prompts import ParsePrompt
+
+from .nodes import parse_node, plan_node, execute_node, synthesize_node
+from .exceptions import AgentError
+from .state import AgentState
 
 
 class NodeName(StrEnum):
     PARSE = "parse"
-    RESPOND = "respond"
-
-
-class StateKey(StrEnum):
-    QUERY = "query"
-    PARSED = "parsed"
-    RESPONSE = "response"
-
-
-class AgentState(TypedDict):
-    query: str
-    parsed: dict | None
-    response: str | None
-
-
-async def parse_node(state: AgentState) -> dict:
-    llm = OllamaProvider()
-    prompt = ParsePrompt.format(query=state[StateKey.QUERY])
-    llm_response = await llm.chat(prompt)
-    data = json.loads(llm_response.content)
-    parsed = ParsedQuery(**data)
-    return {StateKey.PARSED: parsed.model_dump()}
-
-
-async def respond_node(state: AgentState) -> dict:
-    data = state.get(StateKey.PARSED) or {}
-    parsed = ParsedQuery(**data)
-    return {StateKey.RESPONSE: ResponseFormatter.format(parsed)}
+    PLAN = "plan"
+    EXECUTE = "execute"
+    SYNTHESIZE = "synthesize"
 
 
 def create_graph():
+    """워크플로우 그래프 생성."""
     workflow = StateGraph(AgentState)
+
     workflow.add_node(NodeName.PARSE, parse_node)
-    workflow.add_node(NodeName.RESPOND, respond_node)
-    workflow.add_edge(NodeName.PARSE, NodeName.RESPOND)
-    workflow.add_edge(NodeName.RESPOND, END)
+    workflow.add_node(NodeName.PLAN, plan_node)
+    workflow.add_node(NodeName.EXECUTE, execute_node)
+    workflow.add_node(NodeName.SYNTHESIZE, synthesize_node)
+
+    workflow.add_edge(NodeName.PARSE, NodeName.PLAN)
+    workflow.add_edge(NodeName.PLAN, NodeName.EXECUTE)
+    workflow.add_edge(NodeName.EXECUTE, NodeName.SYNTHESIZE)
+    workflow.add_edge(NodeName.SYNTHESIZE, END)
+
     workflow.set_entry_point(NodeName.PARSE)
+
     return workflow.compile()
 
 
@@ -54,13 +38,29 @@ graph = create_graph()
 
 
 async def run_agent(query: str) -> dict:
-    result = await graph.ainvoke({
-        StateKey.QUERY: query,
-        StateKey.PARSED: None,
-        StateKey.RESPONSE: None,
-    })
+    """에이전트 실행."""
+    initial_state = {
+        "query": query,
+        "parsed_conditions": None,
+        "search_plan": None,
+        "crawl_results": None,
+        "crawl_error": None,
+        "response": None,
+        "final_results": None,
+    }
+
+    result = await graph.ainvoke(initial_state)
+
+    response = result.get("response")
+    if not response:
+        raise AgentError("Failed to generate LLM response")
+
+    final_results = result.get("final_results") or []
+
     return {
-        StateKey.QUERY: query,
-        StateKey.PARSED: result.get(StateKey.PARSED),
-        StateKey.RESPONSE: result.get(StateKey.RESPONSE),
+        "query": query,
+        "parsed_conditions": result.get("parsed_conditions"),
+        "response": response,
+        "results": final_results,
+        "total_count": len(final_results),
     }
