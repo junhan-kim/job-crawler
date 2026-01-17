@@ -2,7 +2,7 @@
 
 **목표**: 검색 → 실제 사람인 크롤링 → 결과 표시
 **기간**: 2주
-**기술 스택**: +Playwright, LangChain
+**기술 스택**: +Playwright, Django REST Framework (DRF)
 **선행 조건**: Phase 1 완료
 
 ---
@@ -41,6 +41,44 @@
 ---
 
 ## 티켓 목록
+
+### P2-0: Django REST Framework 도입 (선택)
+
+**설명**
+API 확장성을 위해 DRF를 도입한다. 현재 순수 Django로 작성된 API를 DRF 방식으로 리팩토링한다.
+
+**작업 내용**
+- [ ] `requirements.txt`에 `djangorestframework` 추가
+- [ ] `settings.py`의 `INSTALLED_APPS`에 `rest_framework` 추가
+- [ ] `config/views.py`를 DRF `APIView`로 리팩토링
+  ```python
+  from rest_framework.views import APIView
+  from rest_framework.response import Response
+  from rest_framework import status
+
+  class SearchView(APIView):
+      async def post(self, request):
+          query = request.data.get('query', '').strip()
+          if not query:
+              return Response({'error': 'query required'}, status=status.HTTP_400_BAD_REQUEST)
+          result = await run_agent(query)
+          return Response(result)
+  ```
+- [ ] `config/urls.py` 수정
+  ```python
+  path('api/search/', SearchView.as_view(), name='search'),
+  ```
+
+**완료 기준**
+- 기존 API와 동일하게 동작
+- `request.data`로 요청 데이터 접근
+- DRF Response 사용
+
+**참고**
+- Phase 1에서 API가 단순하여 순수 Django로 구현했으나, 확장성을 위해 DRF 도입 고려
+- 필수는 아님 - 현재 구조로도 충분히 동작함
+
+---
 
 ### P2-1: Playwright 환경 설정
 

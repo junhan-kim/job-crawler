@@ -393,17 +393,17 @@ curl -X POST http://localhost:8000/api/search/ \
 ## 체크리스트
 
 ```
-[ ] P1-1: Django 프로젝트 초기 세팅
-[ ] P1-2: Docker Compose 개발 환경 구성
-[ ] P1-3: Ollama 모델 다운로드 및 연동 테스트
-[ ] P1-4: LLM 추상화 레이어 구현
-[ ] P1-5: LangGraph 기본 워크플로우 구현
-[ ] P1-6: Django API 엔드포인트 구현
-[ ] P1-7: 웹 UI 구현 (검색 페이지)
-[ ] P1-8: Mock 검색 결과 추가
-[ ] P1-9: 에러 처리 및 로깅
+[x] P1-1: Django 프로젝트 초기 세팅 (간소화 - settings 분리 안함)
+[x] P1-2: Docker Compose 개발 환경 구성
+[x] P1-3: Ollama 모델 다운로드 및 연동 테스트 (docker-compose에서 자동 pull)
+[x] P1-4: LLM 추상화 레이어 구현
+[x] P1-5: LangGraph 기본 워크플로우 구현
+[x] P1-6: Django API 엔드포인트 구현
+[x] P1-7: 웹 UI 구현 (검색 페이지)
+[-] P1-8: Mock 검색 결과 추가 (스킵 - 실제 파싱 결과로 대체)
+[~] P1-9: 에러 처리 및 로깅 (기본 에러 처리만 구현)
 ────────────────────────────────────────
-✅ 데모: 검색 입력 → LLM 파싱 → Mock 결과 표시
+✅ 데모: 검색 입력 → LLM 파싱 → 결과 표시 완료
 ```
 
 ---

@@ -1,0 +1,9 @@
+django>=5.0
+djangorestframework>=3.15
+adrf>=0.1
+uvicorn[standard]
+httpx
+python-dotenv
+langgraph
+langchain-core
+pydantic
