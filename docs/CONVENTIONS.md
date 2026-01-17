@@ -20,6 +20,7 @@
 - 클래스: PascalCase
 - 상수: UPPER_SNAKE_CASE
 - 의미가 명확하도록 (약어 최소화)
+- 한 글자 변수명 금지 (예: `i`, `x`, `e` 등)
 
 ## 타입
 - 문자열 등 고정값 → Enum 사용 (StrEnum 등)
@@ -36,6 +37,10 @@
 - 에러 메시지: 영어
 - docstring: 한글
 - UI 텍스트 (사용자 facing): 한글
+
+## 테스트
+- HTTP 상태 코드는 매직넘버 대신 `http.HTTPStatus` 사용
+  - 예: `HTTPStatus.OK`, `HTTPStatus.BAD_REQUEST`
 
 ## 기타
 - 불필요한 코드 삭제 (주석처리 X)
