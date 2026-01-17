@@ -4,6 +4,7 @@ import asyncio
 import random
 
 from aiolimiter import AsyncLimiter
+from django.conf import settings
 from playwright._impl._errors import TimeoutError as PlaywrightTimeout
 from tenacity import (
     retry,
@@ -24,7 +25,7 @@ DEFAULT_MIN_DELAY = 2.0
 DEFAULT_MAX_DELAY = 4.0
 
 CRAWLER_CONCURRENCY_LIMIT = 1
-CRAWLER_WAIT_TIMEOUT_SECONDS = 30
+CRAWLER_TIMEOUT = settings.CRAWLER_TIMEOUT
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

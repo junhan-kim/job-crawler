@@ -2,10 +2,10 @@
 
 import asyncio
 import logging
-
-from playwright.async_api import async_playwright
+import time
 
 from .base import BaseCrawler
+from .browser import get_browser_pool
 from .exceptions import CrawlerBlockedError
 from .models import JobPosting, JobSource
 from .utils import get_random_delay, rate_limiter, retry_on_timeout
@@ -67,19 +67,26 @@ class SaraminCrawler(BaseCrawler):
         Raises:
             CrawlerBlockedError: 차단 감지 시
         """
-        jobs: list[JobPosting] = []
+        t0 = time.perf_counter()
+        pool = await get_browser_pool()
+        logger.debug(f"[TIMING] get_browser_pool: {time.perf_counter() - t0:.2f}s")
 
-        async with async_playwright() as p:
-            browser = await self._launch_browser(p)
-            context = await self._create_context(browser)
+        t1 = time.perf_counter()
+        context = await pool.get_context()
+        logger.debug(f"[TIMING] get_context: {time.perf_counter() - t1:.2f}s")
+
+        try:
+            t2 = time.perf_counter()
             page = await context.new_page()
+            logger.debug(f"[TIMING] new_page: {time.perf_counter() - t2:.2f}s")
 
+            t3 = time.perf_counter()
             await self._apply_stealth(page)
+            logger.debug(f"[TIMING] apply_stealth: {time.perf_counter() - t3:.2f}s")
 
-            try:
-                jobs = await self._crawl_pages(page, keyword, max_pages)
-            finally:
-                await browser.close()
+            jobs = await self._crawl_pages(page, keyword, max_pages)
+        finally:
+            await context.close()
 
         logger.info(f"Total jobs collected: {len(jobs)}")
         return jobs
@@ -91,7 +98,9 @@ class SaraminCrawler(BaseCrawler):
         jobs: list[JobPosting] = []
 
         for page_num in range(1, max_pages + 1):
+            t_rate = time.perf_counter()
             async with rate_limiter:
+                logger.debug(f"[TIMING] rate_limiter wait: {time.perf_counter() - t_rate:.2f}s")
                 page_jobs = await self._crawl_single_page(page, keyword, page_num, max_pages)
                 jobs.extend(page_jobs)
 
@@ -109,12 +118,21 @@ class SaraminCrawler(BaseCrawler):
         url = f"{self.SEARCH_URL}?searchword={keyword}&recruitPage={page_num}"
         logger.info(f"Crawling page {page_num}/{max_pages}: {url}")
 
+        t0 = time.perf_counter()
         await page.goto(url, timeout=self.TIMEOUT_MS, wait_until="domcontentloaded")
+        logger.debug(f"[TIMING] page.goto: {time.perf_counter() - t0:.2f}s")
+
+        t1 = time.perf_counter()
         await page.wait_for_timeout(self.PAGE_LOAD_WAIT_MS)
+        logger.debug(f"[TIMING] wait_for_timeout: {time.perf_counter() - t1:.2f}s")
 
+        t2 = time.perf_counter()
         await self._check_blocked(page)
+        logger.debug(f"[TIMING] check_blocked: {time.perf_counter() - t2:.2f}s")
 
+        t3 = time.perf_counter()
         items = await page.query_selector_all(self.SELECTORS["job_card"])
+        logger.debug(f"[TIMING] query_selector_all: {time.perf_counter() - t3:.2f}s")
         logger.info(f"Found {len(items)} job cards")
 
         jobs = []

@@ -2,15 +2,10 @@
 
 from abc import ABC, abstractmethod
 
-from django.conf import settings
-from playwright.async_api import Browser, BrowserContext, Page
+from playwright.async_api import Page
 from playwright_stealth import Stealth
 
 from .models import JobPosting, JobSource
-from .utils import get_random_user_agent
-
-VIEWPORT_WIDTH = 1920
-VIEWPORT_HEIGHT = 1080
 
 
 class BaseCrawler(ABC):
@@ -40,23 +35,6 @@ class BaseCrawler(ABC):
             JobPosting 리스트
         """
         pass
-
-    async def _launch_browser(self, playwright) -> Browser:
-        """브라우저 실행."""
-        return await playwright.chromium.launch(
-            headless=True,
-            channel="chrome",
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-
-    async def _create_context(self, browser: Browser) -> BrowserContext:
-        """브라우저 컨텍스트 생성."""
-        return await browser.new_context(
-            user_agent=get_random_user_agent(),
-            viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
-            locale=settings.CRAWLER_LOCALE,
-            timezone_id=settings.CRAWLER_TIMEZONE,
-        )
 
     async def _apply_stealth(self, page: Page) -> None:
         """Stealth 모드 적용."""

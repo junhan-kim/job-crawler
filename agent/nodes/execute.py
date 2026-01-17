@@ -6,7 +6,7 @@ import logging
 from agent.models import SearchPlan
 from agent.state import AgentState
 from crawlers import CrawlerError, SaraminCrawler
-from crawlers.utils import CRAWLER_WAIT_TIMEOUT_SECONDS, crawler_semaphore
+from crawlers.utils import CRAWLER_TIMEOUT, crawler_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ async def execute_node(state: AgentState) -> dict:
     logger.info(f"Executing search: keyword='{plan.search_keyword}', max_pages={plan.max_pages}")
 
     try:
-        async with asyncio.timeout(CRAWLER_WAIT_TIMEOUT_SECONDS):
+        async with asyncio.timeout(CRAWLER_TIMEOUT):
             async with crawler_semaphore:
                 return await _execute_crawling(plan.search_keyword, plan.max_pages)
     except TimeoutError:

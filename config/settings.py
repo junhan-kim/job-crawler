@@ -32,6 +32,7 @@ OLLAMA_TIMEOUT = int(os.getenv('OLLAMA_TIMEOUT', '60'))
 CRAWLER_LOCALE = os.getenv('CRAWLER_LOCALE', 'ko-KR')
 CRAWLER_TIMEZONE = os.getenv('CRAWLER_TIMEZONE', 'Asia/Seoul')
 CRAWLER_MAX_PAGES = int(os.getenv('CRAWLER_MAX_PAGES', '1'))
+CRAWLER_TIMEOUT = int(os.getenv('CRAWLER_TIMEOUT', '60'))
 
 # API
 SEARCH_QUERY_MAX_LENGTH = 500
@@ -133,4 +134,38 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
+}
+
+# Logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'agent': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'crawlers': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
 }
