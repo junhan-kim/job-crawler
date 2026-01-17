@@ -42,6 +42,10 @@
 - HTTP 상태 코드는 매직넘버 대신 `http.HTTPStatus` 사용
   - 예: `HTTPStatus.OK`, `HTTPStatus.BAD_REQUEST`
 
+## 커밋 메시지
+- 영어로 한 줄 작성
+- 접두사 필수: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:` 등
+
 ## 기타
 - 불필요한 코드 삭제 (주석처리 X)
 - 한 함수는 한 가지 일만

@@ -5,7 +5,7 @@ import logging
 
 from agent.models import SearchPlan
 from agent.state import AgentState
-from crawlers import CrawlerError, SaraminCrawler
+from crawlers import CrawlerError, JobKoreaCrawler, SaraminCrawler
 from crawlers.utils import CRAWLER_TIMEOUT, crawler_semaphore
 
 logger = logging.getLogger(__name__)
@@ -37,12 +37,30 @@ async def execute_node(state: AgentState) -> dict:
 
 
 async def _execute_crawling(keyword: str, max_pages: int) -> dict:
-    """실제 크롤링 수행."""
+    """실제 크롤링 수행 (사람인 + 잡코리아 병렬)."""
     try:
-        crawler = SaraminCrawler()
-        results = await crawler.search(keyword, max_pages=max_pages)
+        saramin_crawler = SaraminCrawler()
+        jobkorea_crawler = JobKoreaCrawler()
 
-        crawl_results = [job.model_dump() for job in results]
+        saramin_results, jobkorea_results = await asyncio.gather(
+            saramin_crawler.search(keyword, max_pages=max_pages),
+            jobkorea_crawler.search(keyword, max_pages=max_pages),
+            return_exceptions=True,
+        )
+
+        all_results = []
+
+        if isinstance(saramin_results, Exception):
+            logger.error(f"Saramin crawler error: {saramin_results}")
+        else:
+            all_results.extend(saramin_results)
+
+        if isinstance(jobkorea_results, Exception):
+            logger.error(f"JobKorea crawler error: {jobkorea_results}")
+        else:
+            all_results.extend(jobkorea_results)
+
+        crawl_results = [job.model_dump() for job in all_results]
 
         logger.info(f"Crawling completed: {len(crawl_results)} jobs found")
         return {

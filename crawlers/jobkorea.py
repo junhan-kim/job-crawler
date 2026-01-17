@@ -4,9 +4,8 @@ import asyncio
 import logging
 import re
 
-from playwright.async_api import async_playwright
-
 from .base import BaseCrawler
+from .browser import get_browser_pool
 from .exceptions import CrawlerBlockedError
 from .models import JobPosting, JobSource
 from .utils import get_random_delay, rate_limiter, retry_on_timeout
@@ -109,17 +108,15 @@ class JobKoreaCrawler(BaseCrawler):
         """
         seen_urls: set[str] = set()
 
-        async with async_playwright() as p:
-            browser = await self._launch_browser(p)
-            context = await self._create_context(browser)
+        pool = await get_browser_pool()
+        context = await pool.get_context()
+
+        try:
             page = await context.new_page()
-
             await self._apply_stealth(page)
-
-            try:
-                jobs = await self._crawl_pages(page, keyword, max_pages, seen_urls)
-            finally:
-                await browser.close()
+            jobs = await self._crawl_pages(page, keyword, max_pages, seen_urls)
+        finally:
+            await context.close()
 
         logger.info(f"Total jobs collected: {len(jobs)}")
         return jobs

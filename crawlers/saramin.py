@@ -123,8 +123,10 @@ class SaraminCrawler(BaseCrawler):
         logger.debug(f"[TIMING] page.goto: {time.perf_counter() - t0:.2f}s")
 
         t1 = time.perf_counter()
-        await page.wait_for_timeout(self.PAGE_LOAD_WAIT_MS)
-        logger.debug(f"[TIMING] wait_for_timeout: {time.perf_counter() - t1:.2f}s")
+        await page.wait_for_selector(
+            self.SELECTORS["job_card"], timeout=self.PAGE_LOAD_WAIT_MS
+        )
+        logger.debug(f"[TIMING] wait_for_selector: {time.perf_counter() - t1:.2f}s")
 
         t2 = time.perf_counter()
         await self._check_blocked(page)
