@@ -4,27 +4,64 @@ MVP 완성 후 개선할 사항들. 당장 없어도 서비스 동작에 문제�
 
 ---
 
-## 1. 브라우저 풀 관리 (Browser Pool)
+## 1. 동시 요청 제어 고도화
 
-**문제**
-- 동시 요청이 많아지면 브라우저 인스턴스 과다 생성
-- 메모리 폭발, 서버 다운 가능
-
-**해결**
+### 1-1. 현재 구현 (Phase 2)
+세마포어로 동시 요청 1개 제한 + 30초 타임아웃
 ```python
-import asyncio
+# crawlers/utils.py
+crawler_semaphore = asyncio.Semaphore(1)
 
-MAX_BROWSERS = 5
-browser_semaphore = asyncio.Semaphore(MAX_BROWSERS)
-
-async def crawl_with_limit(url):
-    async with browser_semaphore:
-        browser = await playwright.chromium.launch()
-        # 크롤링 수행
-        await browser.close()
+# agent/nodes/execute.py
+async with asyncio.timeout(30):
+    async with crawler_semaphore:
+        # 크롤링
 ```
 
-**도입 시점**: 동시 사용자 10명 이상 예상 시
+### 1-2. 고도화 방향
+
+**다중 서버 환경 (Redis 분산 락)**
+```python
+import redis.asyncio as redis
+from redis.asyncio.lock import Lock
+
+redis_client = redis.from_url("redis://localhost")
+
+async def execute_with_distributed_lock():
+    lock = Lock(redis_client, "crawler_lock", timeout=60)
+    async with lock:
+        # 크롤링
+```
+
+**브라우저 풀 (재사용)**
+```python
+class BrowserPool:
+    def __init__(self, max_size: int = 3):
+        self.pool: asyncio.Queue[Browser] = asyncio.Queue(maxsize=max_size)
+        self.semaphore = asyncio.Semaphore(max_size)
+
+    async def acquire(self) -> Browser:
+        async with self.semaphore:
+            if self.pool.empty():
+                return await self._create_browser()
+            return await self.pool.get()
+
+    async def release(self, browser: Browser):
+        await self.pool.put(browser)
+```
+
+**Celery 작업 큐**
+```python
+@celery_app.task(rate_limit='10/m')
+def crawl_task(keyword: str, max_pages: int):
+    # 크롤링 수행
+    return results
+```
+
+**도입 시점**:
+- Redis 분산 락: 서버 2대 이상 운영 시
+- 브라우저 풀: 동시 사용자 10명 이상 시
+- Celery 큐: 비동기 처리 + 재시도 필요 시
 
 ---
 

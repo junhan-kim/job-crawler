@@ -27,6 +27,11 @@ OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')
 OLLAMA_TIMEOUT = int(os.getenv('OLLAMA_TIMEOUT', '60'))
 
+# Crawler
+CRAWLER_LOCALE = os.getenv('CRAWLER_LOCALE', 'ko-KR')
+CRAWLER_TIMEZONE = os.getenv('CRAWLER_TIMEZONE', 'Asia/Seoul')
+CRAWLER_MAX_PAGES = int(os.getenv('CRAWLER_MAX_PAGES', '1'))
+
 # API
 SEARCH_QUERY_MAX_LENGTH = 500
 

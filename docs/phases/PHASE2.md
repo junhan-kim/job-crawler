@@ -187,40 +187,52 @@ Playwright를 설치하고 Docker 환경에서 실행 가능하도록 설정한�
 ### P2-3: 크롤링 안정성 레이어 추가
 
 **설명**
-크롤링 실패에 대비한 안정성 레이어를 추가한다.
+크롤링 실패에 대비한 안정성 레이어를 추가한다. 검증된 라이브러리를 활용한다.
+
+**의존성 추가**
+```
+tenacity>=8.0        # 재시도 로직
+aiolimiter>=1.1      # async rate limiting
+```
 
 **작업 내용**
+- [ ] `requirements.txt`에 `tenacity`, `aiolimiter` 추가
 - [ ] `crawlers/utils.py` 작성
-  - 재시도 데코레이터
+  - 재시도 데코레이터 (`tenacity` 활용)
     ```python
-    async def retry(func, max_retries=3, delay=2):
-        for i in range(max_retries):
-            try:
-                return await func()
-            except Exception as e:
-                if i == max_retries - 1:
-                    raise
-                await asyncio.sleep(delay * (i + 1))
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((TimeoutError, ConnectionError))
+    )
+    async def fetch_with_retry(page, url):
+        return await page.goto(url, timeout=60000)
     ```
   - User-Agent 로테이션
     ```python
-    USER_AGENTS = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ...",
-    ]
-    ```
-  - 요청 간격 제어 (Rate Limiter)
-    ```python
-    class RateLimiter:
-        def __init__(self, requests_per_minute=30):
-            self.interval = 60 / requests_per_minute
-            self.last_request = 0
+    import random
 
-        async def wait(self):
-            elapsed = time.time() - self.last_request
-            if elapsed < self.interval:
-                await asyncio.sleep(self.interval - elapsed)
-            self.last_request = time.time()
+    USER_AGENTS = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ...",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ...",
+    ]
+
+    def get_random_user_agent() -> str:
+        return random.choice(USER_AGENTS)
+    ```
+  - 요청 간격 제어 (`aiolimiter` 활용)
+    ```python
+    from aiolimiter import AsyncLimiter
+
+    # 분당 20회 요청 제한
+    rate_limiter = AsyncLimiter(20, 60)
+
+    async def crawl_with_limit():
+        async with rate_limiter:
+            # 크롤링 로직
+            ...
     ```
 - [ ] `crawlers/saramin.py`에 적용
 - [ ] 차단 감지 로직 추가
@@ -229,9 +241,13 @@ Playwright를 설치하고 Docker 환경에서 실행 가능하도록 설정한�
   - 감지 시 `CrawlerBlockedError` 발생
 
 **완료 기준**
-- 연속 요청 시 2초 이상 간격 유지
-- 일시적 실패 시 자동 재시도
+- 연속 요청 시 rate limit 준수 (분당 20회)
+- 일시적 실패 시 exponential backoff로 자동 재시도 (최대 3회)
 - 차단 감지 시 명확한 에러 메시지
+
+**참고**
+- tenacity: https://github.com/jd/tenacity
+- aiolimiter: https://github.com/mjpieters/aiolimiter
 
 ---
 
