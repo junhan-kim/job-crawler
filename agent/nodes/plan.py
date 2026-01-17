@@ -4,8 +4,8 @@ import logging
 
 from django.conf import settings
 
+from agent.models import ParsedQuery, SearchFilters, SearchPlan
 from agent.state import AgentState
-from agent.models import ParsedQuery, SearchPlan, SearchFilters
 
 logger = logging.getLogger(__name__)
 

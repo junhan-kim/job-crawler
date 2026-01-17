@@ -3,11 +3,11 @@
 import json
 import logging
 
-from llm import OllamaProvider
+from agent.exceptions import AgentError
 from agent.models import ParsedQuery
 from agent.prompts import ParsePrompt
-from agent.exceptions import AgentError
 from agent.state import AgentState
+from llm import OllamaProvider
 
 logger = logging.getLogger(__name__)
 

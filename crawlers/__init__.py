@@ -1,8 +1,8 @@
-from .models import JobPosting, JobSource
 from .base import BaseCrawler
-from .saramin import SaraminCrawler
+from .exceptions import CrawlerBlockedError, CrawlerError, CrawlerTimeoutError
 from .jobkorea import JobKoreaCrawler
-from .exceptions import CrawlerError, CrawlerBlockedError, CrawlerTimeoutError
+from .models import JobPosting, JobSource
+from .saramin import SaraminCrawler
 
 __all__ = [
     "JobPosting",

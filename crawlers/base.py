@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 from django.conf import settings
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+from playwright.async_api import Browser, BrowserContext, Page
 from playwright_stealth import Stealth
 
 from .models import JobPosting, JobSource

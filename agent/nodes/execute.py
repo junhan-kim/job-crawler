@@ -3,10 +3,10 @@
 import asyncio
 import logging
 
-from crawlers import SaraminCrawler, CrawlerError
-from crawlers.utils import crawler_semaphore, CRAWLER_WAIT_TIMEOUT_SECONDS
-from agent.state import AgentState
 from agent.models import SearchPlan
+from agent.state import AgentState
+from crawlers import CrawlerError, SaraminCrawler
+from crawlers.utils import CRAWLER_WAIT_TIMEOUT_SECONDS, crawler_semaphore
 
 logger = logging.getLogger(__name__)
 

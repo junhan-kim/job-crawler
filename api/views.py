@@ -2,8 +2,9 @@ from adrf.views import APIView
 from rest_framework.response import Response
 
 from agent import run_agent
-from .serializers import SearchRequestSerializer, SearchResponseSerializer, RequestField
+
 from .exceptions import LLMError
+from .serializers import RequestField, SearchRequestSerializer, SearchResponseSerializer
 
 
 class SearchView(APIView):
@@ -31,7 +32,7 @@ class SearchView(APIView):
         try:
             result = await run_agent(query)
         except Exception as e:
-            raise LLMError(detail=str(e))
+            raise LLMError(detail=str(e)) from e
 
         response_serializer = SearchResponseSerializer(result)
         return Response(response_serializer.data)

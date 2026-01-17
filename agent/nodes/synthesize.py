@@ -2,8 +2,8 @@
 
 import logging
 
-from agent.state import AgentState
 from agent.models import ParsedQuery
+from agent.state import AgentState
 from crawlers.models import JobPosting
 
 logger = logging.getLogger(__name__)

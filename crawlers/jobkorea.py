@@ -7,9 +7,9 @@ import re
 from playwright.async_api import async_playwright
 
 from .base import BaseCrawler
-from .models import JobPosting, JobSource
 from .exceptions import CrawlerBlockedError
-from .utils import rate_limiter, get_random_delay, retry_on_timeout
+from .models import JobPosting, JobSource
+from .utils import get_random_delay, rate_limiter, retry_on_timeout
 
 logger = logging.getLogger(__name__)
 

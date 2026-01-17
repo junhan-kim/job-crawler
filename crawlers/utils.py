@@ -2,15 +2,15 @@
 
 import asyncio
 import random
+
 from aiolimiter import AsyncLimiter
+from playwright._impl._errors import TimeoutError as PlaywrightTimeout
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
-from playwright._impl._errors import TimeoutError as PlaywrightTimeout
-
 
 REQUESTS_PER_MINUTE = 20
 RATE_LIMIT_PERIOD_SECONDS = 60
