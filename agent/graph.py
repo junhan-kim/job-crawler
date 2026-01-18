@@ -1,11 +1,13 @@
 """에이전트 워크플로우 정의."""
 
-import time
 from enum import StrEnum
 
 from langgraph.graph import END, StateGraph
 
+from core.performance import PerformanceTracker
+
 from .exceptions import AgentError
+from .models import AgentResponse, ParsedQuery
 from .nodes import execute_node, parse_node, plan_node, synthesize_node
 from .state import AgentState
 
@@ -39,9 +41,9 @@ def create_graph():
 graph = create_graph()
 
 
-async def run_agent(query: str) -> dict:
+async def run_agent(query: str) -> AgentResponse:
     """에이전트 실행."""
-    start_time = time.perf_counter()
+    tracker = PerformanceTracker("agent").start()
 
     initial_state = {
         "query": query,
@@ -60,13 +62,14 @@ async def run_agent(query: str) -> dict:
         raise AgentError("Failed to generate LLM response")
 
     final_results = result.get("final_results") or []
-    elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+    tracker.stop()
+    parsed_conditions = result.get("parsed_conditions")
 
-    return {
-        "query": query,
-        "parsed_conditions": result.get("parsed_conditions"),
-        "response": response,
-        "results": final_results,
-        "total_count": len(final_results),
-        "search_time_ms": elapsed_ms,
-    }
+    return AgentResponse(
+        query=query,
+        parsed_conditions=ParsedQuery(**parsed_conditions) if parsed_conditions else None,
+        response=response,
+        results=final_results,
+        total_count=len(final_results),
+        search_time_ms=int(tracker.elapsed_ms),
+    )

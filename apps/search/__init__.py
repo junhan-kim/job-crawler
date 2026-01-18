@@ -1,0 +1,1 @@
+"""Search history app."""

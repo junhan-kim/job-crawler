@@ -30,9 +30,9 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && wait"]
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && ollama pull nomic-embed-text && wait"]
     healthcheck:
-      test: ["CMD-SHELL", "ollama list | grep -q llama3.2"]
+      test: ["CMD-SHELL", "ollama list | grep -q llama3.2 && ollama list | grep -q nomic-embed-text"]
       interval: 10s
       timeout: 30s
       retries: 30

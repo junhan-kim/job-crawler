@@ -49,5 +49,5 @@ def _create_search_plan(keywords: list[str], conditions: ParsedQuery) -> SearchP
             experience=conditions.experience,
             location=conditions.location,
         ),
-        max_pages=settings.CRAWLER_MAX_PAGES,
+        max_pages=settings.AGENT_CRAWL_MAX_PAGES,
     )

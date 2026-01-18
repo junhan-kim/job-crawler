@@ -4,7 +4,6 @@ import logging
 
 from agent.models import ParsedQuery
 from agent.state import AgentState
-from crawlers.models import JobPosting
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +27,11 @@ async def synthesize_node(state: AgentState) -> dict:
     if not results:
         return _empty_response()
 
-    filtered_results = _apply_filters(results, conditions)
-    response = _generate_response(conditions, filtered_results)
+    response = _generate_response(conditions, results)
 
     return {
         "response": response,
-        "final_results": filtered_results,
+        "final_results": results,
     }
 
 
@@ -51,16 +49,6 @@ def _empty_response() -> dict:
         "response": "검색 조건에 맞는 채용공고를 찾지 못했습니다.",
         "final_results": [],
     }
-
-
-def _apply_filters(results: list[dict], conditions: ParsedQuery) -> list[dict]:
-    """조건에 따라 결과 필터링."""
-    jobs = [JobPosting(**r) for r in results]
-
-    if conditions.location:
-        jobs = [j for j in jobs if conditions.location in (j.location or "")]
-
-    return [j.model_dump() for j in jobs]
 
 
 def _generate_response(conditions: ParsedQuery, results: list[dict]) -> str:

@@ -8,15 +8,6 @@ class RequestField:
     QUERY = "query"
 
 
-class ResponseField:
-    QUERY = "query"
-    PARSED_CONDITIONS = "parsed_conditions"
-    RESPONSE = "response"
-    RESULTS = "results"
-    TOTAL_COUNT = "total_count"
-    SEARCH_TIME_MS = "search_time_ms"
-
-
 class SearchRequestSerializer(serializers.Serializer):
     query = serializers.CharField()
 
@@ -62,3 +53,13 @@ class SearchResponseSerializer(serializers.Serializer):
     results = JobPostingSerializer(many=True)
     total_count = serializers.IntegerField()
     search_time_ms = serializers.IntegerField()
+
+
+class SearchHistorySerializer(serializers.Serializer):
+    """검색 히스토리."""
+
+    id = serializers.IntegerField()
+    query = serializers.CharField()
+    result_count = serializers.IntegerField()
+    search_time_ms = serializers.IntegerField()
+    created_at = serializers.DateTimeField()

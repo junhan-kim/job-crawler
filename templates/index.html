@@ -44,6 +44,16 @@
 
         .error { background: #fef2f2; color: #dc2626; border-radius: 8px; padding: 20px; }
         .empty-state { text-align: center; padding: 40px; color: #6b7280; }
+
+        /* 검색 히스토리 */
+        .history-section { margin-top: 30px; }
+        .history-section h3 { font-size: 16px; color: #4b5563; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .history-list { display: flex; flex-direction: column; gap: 8px; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb; cursor: pointer; transition: all 0.2s; }
+        .history-item:hover { border-color: #2563eb; background: #f8fafc; }
+        .history-query { font-size: 14px; color: #1f2937; }
+        .history-meta { display: flex; gap: 12px; font-size: 13px; color: #6b7280; }
+        .history-empty { text-align: center; padding: 20px; color: #9ca3af; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -54,11 +64,13 @@
             <button id="search">검색</button>
         </div>
         <div id="result"></div>
+        <div id="history" class="history-section"></div>
     </div>
     <script>
         const queryInput = document.getElementById('query');
         const searchBtn = document.getElementById('search');
         const resultDiv = document.getElementById('result');
+        const historyDiv = document.getElementById('history');
 
         function renderLoading() {
             return '<div class="loading"><span class="loading-spinner"></span>채용 공고를 검색하고 있습니다...</div>';
@@ -149,6 +161,8 @@
                     resultDiv.innerHTML = renderError(data.error);
                 } else {
                     resultDiv.innerHTML = renderResults(data);
+                    // 검색 성공 후 히스토리 새로고침
+                    loadHistory();
                 }
             } catch (e) {
                 resultDiv.innerHTML = renderError('요청 실패: ' + e.message);
@@ -159,6 +173,69 @@
 
         searchBtn.addEventListener('click', search);
         queryInput.addEventListener('keypress', e => { if (e.key === 'Enter') search(); });
+
+        // 검색 히스토리 기능
+        const MS_PER_MINUTE = 60000;
+        const MS_PER_HOUR = 3600000;
+        const MS_PER_DAY = 86400000;
+        const MINUTES_PER_HOUR = 60;
+        const HOURS_PER_DAY = 24;
+
+        function formatTimeAgo(isoString) {
+            const date = new Date(isoString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / MS_PER_MINUTE);
+            const diffHours = Math.floor(diffMs / MS_PER_HOUR);
+            const diffDays = Math.floor(diffMs / MS_PER_DAY);
+
+            if (diffMins < 1) return '방금 전';
+            if (diffMins < MINUTES_PER_HOUR) return `${diffMins}분 전`;
+            if (diffHours < HOURS_PER_DAY) return `${diffHours}시간 전`;
+            return `${diffDays}일 전`;
+        }
+
+        function renderHistoryItem(item) {
+            return `
+                <div class="history-item" onclick="searchFromHistory('${escapeHtml(item.query)}')">
+                    <span class="history-query">${escapeHtml(item.query)}</span>
+                    <div class="history-meta">
+                        <span>${item.result_count}건</span>
+                        <span>${formatTimeAgo(item.created_at)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderHistory(histories) {
+            if (!histories || histories.length === 0) {
+                return '';
+            }
+            return `
+                <h3>최근 검색</h3>
+                <div class="history-list">
+                    ${histories.map(renderHistoryItem).join('')}
+                </div>
+            `;
+        }
+
+        function searchFromHistory(query) {
+            queryInput.value = query;
+            search();
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/search/history/');
+                const data = await res.json();
+                historyDiv.innerHTML = renderHistory(data.histories);
+            } catch (e) {
+                console.error('Failed to load history:', e);
+            }
+        }
+
+        // 페이지 로드 시 히스토리 불러오기
+        document.addEventListener('DOMContentLoaded', loadHistory);
     </script>
 </body>
 </html>

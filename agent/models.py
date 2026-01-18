@@ -24,3 +24,43 @@ class SearchPlan(BaseModel):
     search_keyword: str = ""
     filters: SearchFilters = Field(default_factory=SearchFilters)
     max_pages: int = 1
+
+
+class JobSearchResult(BaseModel):
+    """검색 결과 스키마."""
+
+    title: str
+    company: str
+    location: str
+    url: str
+    skills: list[str] | str | None
+    experience: str | None
+    salary: str | None
+    source: str
+    score: float | None = None
+    deadline: str | None = None
+    posted_at: str | None = None
+
+
+class ExecuteResult(BaseModel):
+    """execute_node 반환 스키마."""
+
+    crawl_results: list[dict] = Field(default_factory=list)
+    crawl_error: str | None = None
+
+
+class AgentResponse(BaseModel):
+    """에이전트 응답 스키마."""
+
+    query: str
+    parsed_conditions: ParsedQuery | None = None
+    response: str
+    results: list[dict] = Field(default_factory=list)
+    total_count: int = 0
+    search_time_ms: int = 0
+
+
+class HistoryListResponse(BaseModel):
+    """검색 히스토리 목록 응답."""
+
+    histories: list[dict] = Field(default_factory=list)

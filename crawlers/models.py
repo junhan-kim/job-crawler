@@ -25,3 +25,16 @@ class JobPosting(BaseModel):
     skills: list[str] = Field(default_factory=list)
     deadline: str | None = None
     posted_at: str | None = None
+
+    def to_django_defaults(self) -> dict:
+        """Django ORM aupdate_or_create의 defaults 딕셔너리로 변환."""
+        return {
+            "title": self.title,
+            "company": self.company,
+            "location": self.location,
+            "url": self.url,
+            "experience": self.experience,
+            "salary": self.salary,
+            "skills": self.skills,
+            "is_active": True,
+        }

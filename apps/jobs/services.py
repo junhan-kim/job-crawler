@@ -9,7 +9,7 @@ from .types import JobAction, SaveResult, SaveResultKey
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_ENABLED = bool(os.getenv("OPENAI_API_KEY"))
+EMBEDDING_ENABLED = bool(os.getenv("DB_HOST"))
 
 
 class JobService:
