@@ -32,8 +32,9 @@ OLLAMA_TIMEOUT = int(os.getenv('OLLAMA_TIMEOUT', '60'))
 # Crawler
 CRAWLER_LOCALE = os.getenv('CRAWLER_LOCALE', 'ko-KR')
 CRAWLER_TIMEZONE = os.getenv('CRAWLER_TIMEZONE', 'Asia/Seoul')
-CRAWLER_MAX_PAGES = int(os.getenv('CRAWLER_MAX_PAGES', '1'))
 CRAWLER_TIMEOUT = int(os.getenv('CRAWLER_TIMEOUT', '60'))
+BATCH_CRAWL_MAX_PAGES = int(os.getenv('BATCH_CRAWL_MAX_PAGES', '1'))
+AGENT_CRAWL_MAX_PAGES = int(os.getenv('AGENT_CRAWL_MAX_PAGES', '1'))
 
 # API
 SEARCH_QUERY_MAX_LENGTH = 500
@@ -163,7 +164,11 @@ CELERY_TIMEZONE = 'Asia/Seoul'
 CELERY_BEAT_SCHEDULE = {
     'crawl-popular-keywords': {
         'task': 'apps.jobs.tasks.crawl_popular_keywords',
-        'schedule': crontab(hour='*/6'),  # 6시간마다
+        'schedule': crontab(hour='*/6'),
+    },
+    'crawl-recent-search-keywords': {
+        'task': 'apps.jobs.tasks.crawl_recent_search_keywords',
+        'schedule': crontab(hour='*/1'),
     },
 }
 

@@ -263,26 +263,75 @@ curl http://localhost:8000/v1/chat/completions \
 
 ---
 
-## 9. 사용자 인증
+## 9. 사용자 인증 (Authentication)
 
 **문제**
 - 검색 히스토리 개인화 불가
 - 저장 기능 구현 불가
+- 사용자별 API 사용량 추적 불가
+- 프리미엄 기능 분리 불가
 
-**해결**
+**해결 방안**
+
+**Option A: Django 기본 인증 + JWT**
 ```python
-# Django 기본 인증 + JWT
-from rest_framework_simplejwt.authentication import JWTAuthentication
+# requirements.txt
+djangorestframework-simplejwt>=5.3
 
-# 또는 소셜 로그인
-# django-allauth 사용
+# settings.py
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}
+
+# views.py
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+urlpatterns = [
+    path('api/token/', TokenObtainPairView.as_view()),
+    path('api/token/refresh/', TokenRefreshView.as_view()),
+]
+```
+
+**Option B: 소셜 로그인 (django-allauth)**
+```python
+# requirements.txt
+django-allauth>=0.61
+
+# settings.py
+INSTALLED_APPS = [
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.github',
+    'allauth.socialaccount.providers.kakao',  # 카카오 로그인
+]
+
 SOCIALACCOUNT_PROVIDERS = {
-    'google': {...},
-    'github': {...},
+    'google': {
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+    },
+    'kakao': {
+        'AUTH_PARAMS': {},
+    },
 }
 ```
 
-**도입 시점**: 개인화 기능 필요 시
+**구현 필요 사항**
+1. User 모델 확장 (프로필, 선호 검색 조건)
+2. 인증 미들웨어 적용
+3. 보호된 API 엔드포인트 분리
+4. 로그인/회원가입 UI
+
+**도입 시점**: 개인화 기능 필요 시 (공고 저장, 검색 히스토리 등)
 
 ---
 
@@ -349,6 +398,74 @@ tools = await mcp_client.list_tools()
 
 ---
 
+## 12. 환경변수 관리 (Configuration Management)
+
+**문제**
+- `.env` 파일 수동 관리
+- 환경별(dev/staging/prod) 설정 분리 필요
+- 시크릿 노출 위험
+
+**현재 상태**
+```bash
+# 개발: docker-compose.yml의 environment 섹션 사용
+# .env 파일 없어도 동작 (기본값 존재)
+
+# 프로덕션: .env 필수
+cp .env.example .env
+# SECRET_KEY, DB_PASSWORD, OPENAI_API_KEY 등 변경 필요
+```
+
+**해결 방안**
+
+**Option A: 환경별 .env 파일**
+```bash
+.env.dev        # 로컬 개발
+.env.staging    # 스테이징
+.env.prod       # 프로덕션 (gitignore)
+
+# docker-compose 실행 시
+docker-compose --env-file .env.prod up
+```
+
+**Option B: 시크릿 관리 도구**
+```python
+# AWS Secrets Manager
+import boto3
+
+def get_secret(secret_name: str) -> dict:
+    client = boto3.client('secretsmanager')
+    response = client.get_secret_value(SecretId=secret_name)
+    return json.loads(response['SecretString'])
+
+# 또는 HashiCorp Vault
+import hvac
+client = hvac.Client(url='https://vault.example.com')
+secret = client.secrets.kv.read_secret_version(path='job-crawler/prod')
+```
+
+**Option C: Kubernetes Secrets (K8s 배포 시)**
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: job-crawler-secrets
+type: Opaque
+data:
+  SECRET_KEY: base64_encoded_value
+  DB_PASSWORD: base64_encoded_value
+```
+
+**필수 시크릿 목록**
+| 키 | 용도 | 개발 기본값 |
+|----|-----|------------|
+| `SECRET_KEY` | Django 암호화 | 있음 |
+| `DB_PASSWORD` | PostgreSQL | `postgres` |
+| `OPENAI_API_KEY` | 임베딩 | 없음 (선택) |
+
+**도입 시점**: 프로덕션 배포 전
+
+---
+
 ## 우선순위 정리
 
 | 순위 | 항목 | 이유 |
@@ -364,3 +481,4 @@ tools = await mcp_client.list_tools()
 | 9 | vLLM | 대규모 운영 시 |
 | 10 | 모바일 앱 | 확장 |
 | 11 | MCP | Tool 5개 이상, 외부 연동 시 |
+| 12 | 환경변수 관리 | 프로덕션 배포 전 필수 |
