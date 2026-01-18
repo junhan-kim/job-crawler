@@ -7,8 +7,8 @@
 | **Backend** | Django 5.x | 풀스택 프레임워크, 인증/ORM 내장, Admin 제공 |
 | **API** | Django REST Framework | REST API 구축, 직렬화, 인증 통합 |
 | **Database** | PostgreSQL 16 | 안정성, pgvector 확장 지원 |
-| **Cache/Queue** | Redis | Celery 브로커 + 응답 캐싱 |
-| **Task Queue** | Celery | 백그라운드 작업 (주기적 크롤링, 배치 임베딩) |
+| **Task Queue** | Celery + Redis | 백그라운드 작업 (주기적 크롤링, 배치 임베딩) |
+| **Semantic Cache** | GPTCache | LLM 응답 시맨틱 캐싱, 유사 쿼리 매칭 |
 
 ---
 
@@ -22,6 +22,7 @@
 | **LLM (Prod)** | Claude 3.5 Sonnet | 한국어 성능, 긴 컨텍스트 |
 | **Embedding** | text-embedding-3-small | 가성비, 한국어 지원 |
 | **Vector DB** | pgvector | PostgreSQL 확장, 인프라 단순화 |
+| **RAG Framework** | LlamaIndex | 벡터 검색, 하이브리드 검색, 데이터 로더 통합 |
 
 ---
 
@@ -59,11 +60,9 @@
 |------|------|----------|
 | **Tool Protocol** | MCP (Model Context Protocol) | 복잡한 Tool 관리 필요 시 |
 | **LLM Self-hosting** | vLLM | 트래픽 증가로 비용 절감 필요 시 |
-| **Semantic Cache** | GPTCache | LLM 비용 추가 절감 필요 시 |
 | **Multi-Agent** | CrewAI | 복잡한 멀티에이전트 협업 필요 시 |
 | **Vector DB (대규모)** | Qdrant / Pinecone | 공고 100만건+ 또는 고성능 필요 시 |
 | **LLM Gateway** | Portkey / LiteLLM | 다중 LLM Provider 관리, 로드밸런싱 |
-| **RAG 고도화** | LlamaIndex | 복잡한 RAG 파이프라인 필요 시 |
 | **Prompt Testing** | Promptfoo | 프롬프트 A/B 테스트 자동화 |
 
 ---
@@ -77,8 +76,8 @@ Phase 1: Django, Ollama, LangGraph, Docker
 Phase 2: +Playwright, LangChain
          └── 실제 크롤링
 
-Phase 3: +PostgreSQL, pgvector, Redis, text-embedding-3-small
-         └── RAG + 캐싱
+Phase 3: +PostgreSQL, pgvector, GPTCache, Celery, text-embedding-3-small, LlamaIndex
+         └── RAG + 캐싱 + 주기적 크롤링
 
 Phase 4: +SSE, httpx
          └── 멀티 소스 + 스트리밍

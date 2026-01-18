@@ -301,6 +301,54 @@ SOCIALACCOUNT_PROVIDERS = {
 
 ---
 
+## 11. MCP (Model Context Protocol) 도입
+
+**문제**
+- 현재 Tool 정의가 코드에 하드코딩됨
+- 새로운 Tool 추가 시 Agent 코드 수정 필요
+- Tool 간 표준화된 인터페이스 부재
+
+**MCP란?**
+- "AI 에이전트의 USB-C" - LLM과 외부 도구 간 표준 프로토콜
+- Anthropic이 주도하는 오픈 표준
+- Tool 정의를 JSON Schema로 표준화
+
+**해결**
+```python
+# MCP 서버 정의 (tools/mcp_server.py)
+from mcp import Server, Tool
+
+server = Server("job-crawler-tools")
+
+@server.tool()
+async def search_jobs(keyword: str, location: str = None) -> list:
+    """채용공고 검색"""
+    return await crawler.search(keyword, location)
+
+@server.tool()
+async def get_job_detail(job_id: str) -> dict:
+    """공고 상세 조회"""
+    return await JobPosting.objects.aget(id=job_id)
+
+# MCP 클라이언트 연결 (agent/nodes/execute.py)
+from mcp import Client
+
+mcp_client = Client()
+await mcp_client.connect("job-crawler-tools")
+
+# Tool 목록 자동 조회
+tools = await mcp_client.list_tools()
+```
+
+**장점**
+- Tool 추가/수정 시 Agent 코드 변경 불필요
+- 다른 AI 서비스와 Tool 공유 가능
+- Tool 버전 관리 용이
+
+**도입 시점**: Tool 5개 이상 또는 외부 서비스 연동 시
+
+---
+
 ## 우선순위 정리
 
 | 순위 | 항목 | 이유 |
@@ -315,3 +363,4 @@ SOCIALACCOUNT_PROVIDERS = {
 | 8 | A/B 테스트 | 최적화 |
 | 9 | vLLM | 대규모 운영 시 |
 | 10 | 모바일 앱 | 확장 |
+| 11 | MCP | Tool 5개 이상, 외부 연동 시 |
