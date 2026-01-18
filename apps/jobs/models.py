@@ -1,7 +1,7 @@
 from django.db import models
 from pgvector.django import VectorField
 
-from .constants import EMBEDDING_DIMENSIONS
+from core.constants import EMBEDDING_DIMENSIONS
 
 
 class JobPosting(models.Model):

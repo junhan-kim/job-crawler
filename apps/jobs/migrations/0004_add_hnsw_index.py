@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
     """HNSW 인덱스 마이그레이션."""
 
     dependencies = [
-        ("jobs", "0002_initial"),
+        ("jobs", "0003_add_embedding"),
     ]
 
     operations = [
