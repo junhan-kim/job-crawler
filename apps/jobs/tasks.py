@@ -40,7 +40,7 @@ def crawl_and_save(self, keyword: str, max_pages: int | None = None):
         logger.info(f"Completed crawl for: {keyword}")
     except Exception as error:
         logger.error(f"Crawl failed for {keyword}: {error}")
-        raise self.retry(exc=error)
+        raise self.retry(exc=error) from error
 
 
 async def _crawl_and_save_async(keyword: str, max_pages: int | None):
