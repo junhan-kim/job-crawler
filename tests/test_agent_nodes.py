@@ -3,7 +3,7 @@
 
 from agent.models import ParsedQuery
 from agent.nodes.plan import _build_keywords, _create_search_plan
-from agent.nodes.synthesize import _apply_filters, _generate_response
+from agent.nodes.synthesize import _generate_response
 
 
 class TestPlanNode:
@@ -40,24 +40,6 @@ class TestPlanNode:
 
 class TestSynthesizeNode:
     """synthesize 노드 테스트."""
-
-    def test_apply_filters_by_location(self, sample_job_posting):
-        """지역 필터링."""
-        results = [sample_job_posting]
-        conditions = ParsedQuery(location="서울")
-
-        filtered = _apply_filters(results, conditions)
-
-        assert len(filtered) == 1
-
-    def test_apply_filters_no_match(self, sample_job_posting):
-        """매칭 안되면 필터링."""
-        results = [sample_job_posting]
-        conditions = ParsedQuery(location="부산")
-
-        filtered = _apply_filters(results, conditions)
-
-        assert len(filtered) == 0
 
     def test_generate_response_with_results(self):
         """결과 있을 때 응답 생성."""

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from celery.schedules import crontab
@@ -88,7 +89,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-if os.getenv('DB_HOST'):
+TESTING = 'pytest' in sys.modules
+
+if os.getenv('DB_HOST') and not TESTING:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
