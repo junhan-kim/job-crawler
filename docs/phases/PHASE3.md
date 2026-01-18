@@ -2,7 +2,7 @@
 
 **목표**: 이전 검색 결과 재활용 + 더 정확한 매칭
 **기간**: 2주
-**기술 스택**: +PostgreSQL, pgvector, Redis, text-embedding-3-small
+**기술 스택**: +PostgreSQL, pgvector, GPTCache, text-embedding-3-small
 **선행 조건**: Phase 2 완료
 
 ---
@@ -352,74 +352,104 @@ pgvector를 사용하여 벡터 유사도 검색을 구현한다.
 
 ---
 
-### P3-6: Redis 캐싱 설정
+### P3-6: GPTCache 시맨틱 캐싱 설정
 
 **설명**
-검색 결과와 임베딩을 Redis에 캐싱하여 응답 속도를 향상시킨다.
+GPTCache를 사용하여 시맨틱 캐싱을 구현한다. 유사한 검색어도 캐시 히트가 가능하다.
+
+**GPTCache 선택 이유**
+- LangChain/LlamaIndex 통합 완벽
+- TTL, eviction, 유사도 threshold 내장
+- 직접 구현 대비 안정성 높음
+- 다양한 벡터 저장소 지원 (FAISS, pgvector 등)
 
 **작업 내용**
-- [ ] docker-compose.yml에 Redis 추가
-  ```yaml
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+- [ ] `requirements.txt`에 `gptcache` 추가
   ```
-- [ ] Django 캐시 설정
-  ```python
-  CACHES = {
-      'default': {
-          'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-          'LOCATION': os.getenv('REDIS_URL', 'redis://redis:6379/0'),
-      }
-  }
+  gptcache>=0.1.40
   ```
 - [ ] `core/cache.py` 작성
   ```python
-  from django.core.cache import cache
-  import hashlib
-  import json
+  from gptcache import cache
+  from gptcache.embedding import OpenAI as OpenAIEmbedding
+  from gptcache.similarity_evaluation import SearchDistanceEvaluation
+  from gptcache.manager import CacheBase, VectorBase, get_data_manager
+
+  def init_gptcache():
+      """GPTCache 초기화"""
+      # 임베딩 모델 설정
+      embedding = OpenAIEmbedding(model="text-embedding-3-small")
+
+      # 유사도 평가 설정 (0.88 이상이면 캐시 히트)
+      similarity_evaluation = SearchDistanceEvaluation()
+
+      # 저장소 설정 (SQLite + FAISS)
+      cache_base = CacheBase("sqlite")
+      vector_base = VectorBase("faiss", dimension=1536)
+      data_manager = get_data_manager(cache_base, vector_base)
+
+      # 캐시 초기화
+      cache.init(
+          embedding_func=embedding.to_embeddings,
+          similarity_evaluation=similarity_evaluation,
+          data_manager=data_manager,
+      )
+
+      # TTL 설정 (24시간)
+      cache.config.set("ttl", 86400)
+  ```
+- [ ] LangChain 통합
+  ```python
+  from gptcache.adapter.langchain_models import LangChainChat
+  from langchain_openai import ChatOpenAI
+
+  # 캐시가 적용된 LLM
+  llm = LangChainChat(chat=ChatOpenAI(model="gpt-4o-mini"))
+  ```
+- [ ] 검색 결과 캐싱 래퍼
+  ```python
+  from gptcache import cache
 
   class SearchCache:
-      TTL = 3600  # 1시간
+      def __init__(self, similarity_threshold: float = 0.88):
+          self.threshold = similarity_threshold
 
-      @staticmethod
-      def _make_key(query: str, filters: dict) -> str:
-          """캐시 키 생성"""
-          data = json.dumps({"query": query, "filters": filters}, sort_keys=True)
-          return f"search:{hashlib.md5(data.encode()).hexdigest()}"
-
-      async def get(self, query: str, filters: dict) -> list | None:
-          """캐시에서 검색 결과 조회"""
-          key = self._make_key(query, filters)
-          return cache.get(key)
-
-      async def set(self, query: str, filters: dict, results: list):
-          """검색 결과 캐싱"""
-          key = self._make_key(query, filters)
-          cache.set(key, results, self.TTL)
-  ```
-- [ ] 쿼리 임베딩 캐싱
-  ```python
-  class EmbeddingCache:
-      TTL = 86400  # 24시간
-
-      async def get_or_create(self, text: str) -> list[float]:
-          key = f"embed:{hashlib.md5(text.encode()).hexdigest()}"
-          cached = cache.get(key)
+      async def get_or_search(
+          self,
+          query: str,
+          search_func: callable
+      ) -> list:
+          """캐시에서 조회하거나 검색 실행"""
+          # GPTCache가 자동으로 유사 쿼리 매칭
+          cached = cache.get(query)
           if cached:
               return cached
-          embedding = await self.embedding_service.embed_text(text)
-          cache.set(key, embedding, self.TTL)
-          return embedding
+
+          # 캐시 미스 - 검색 실행
+          results = await search_func(query)
+
+          # 캐시 저장
+          cache.set(query, results)
+          return results
+  ```
+- [ ] 캐시 모니터링 설정
+  ```python
+  # 캐시 히트율 로깅
+  from gptcache.utils import log
+
+  log.set_level("INFO")  # 캐시 히트/미스 로깅
   ```
 
 **완료 기준**
-- Redis 연결 성공
-- 동일 검색어 두 번째 요청 시 캐시 히트
-- 캐시 TTL 동작 확인
+- GPTCache 초기화 성공
+- "Python 백엔드" 검색 후 "파이썬 백엔드" 검색 시 캐시 히트
+- 캐시 히트율 로그 확인
+- TTL 만료 후 캐시 무효화 확인
+
+**참고**
+- GPTCache GitHub: https://github.com/zilliztech/GPTCache
+- 유사도 threshold: 0.88로 시작, 모니터링 후 조정
+- 벡터 저장소를 pgvector로 변경 가능 (나중에)
 
 ---
 
@@ -558,7 +588,7 @@ pgvector를 사용하여 벡터 유사도 검색을 구현한다.
 [ ] P3-3: 임베딩 생성 모듈 구현
 [ ] P3-4: 크롤링 결과 DB 저장
 [ ] P3-5: 벡터 검색 (RAG) 구현
-[ ] P3-6: Redis 캐싱 설정
+[ ] P3-6: GPTCache 시맨틱 캐싱 설정
 [ ] P3-7: 검색 히스토리 기능
 [ ] P3-8: 검색 히스토리 UI
 [ ] P3-9: 검색 성능 최적화
@@ -574,5 +604,6 @@ pgvector를 사용하여 벡터 유사도 검색을 구현한다.
 |------|----------|
 | pgvector 인덱스 느림 | HNSW 인덱스 파라미터 튜닝 (m, ef_construction) |
 | 임베딩 API 비용 | 배치 처리, 캐싱, 필요한 공고만 임베딩 |
-| Redis 메모리 부족 | TTL 조정, maxmemory-policy 설정 |
+| GPTCache 캐시 히트율 낮음 | similarity threshold 낮추기 (0.88 → 0.85) |
+| GPTCache 잘못된 캐시 히트 | similarity threshold 높이기 (0.88 → 0.92) |
 | 검색 결과 품질 낮음 | 임베딩 텍스트 포맷 개선, 리랭킹 추가 |
