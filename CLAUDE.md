@@ -39,6 +39,12 @@
 - UI 텍스트 (사용자 facing): 한글
 
 ## 테스트
+- FIRST 원칙 준수
+  - **F**ast: 외부 의존성(Redis, DB, API 등) 모킹하여 빠르게 실행
+  - **I**ndependent: 테스트 간 독립적, 순서 무관
+  - **R**epeatable: 어떤 환경에서도 동일 결과
+  - **S**elf-validating: 성공/실패 자동 판단
+  - **T**imely: 프로덕션 코드 작성 전/직후 작성
 - HTTP 상태 코드는 매직넘버 대신 `http.HTTPStatus` 사용
   - 예: `HTTPStatus.OK`, `HTTPStatus.BAD_REQUEST`
 

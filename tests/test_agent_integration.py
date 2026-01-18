@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from django.test import AsyncClient
 
+from agent.models import AgentResponse, ParsedQuery
 from crawlers.models import JobPosting, JobSource
 
 
@@ -36,23 +37,55 @@ def mock_job_postings():
     ]
 
 
+@pytest.fixture
+def mock_agent_response(mock_job_postings):
+    """테스트용 AgentResponse."""
+    return AgentResponse(
+        query="서울 백엔드 개발자 3년차",
+        parsed_conditions=ParsedQuery(
+            role="백엔드 개발자",
+            experience=3,
+            skills=["Python"],
+            location="서울",
+        ),
+        response="검색 완료",
+        results=[
+            {
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "url": job.url,
+                "source": job.source.value,
+                "experience": job.experience,
+                "skills": job.skills,
+                "deadline": job.deadline,
+            }
+            for job in mock_job_postings
+        ],
+        total_count=len(mock_job_postings),
+        search_time_ms=0,
+    )
+
+
+@pytest.fixture
+def mock_cache():
+    """Redis 캐시 모킹."""
+    with patch("api.views.SearchResultCache") as mock_class:
+        mock_instance = AsyncMock()
+        mock_instance.get.return_value = None
+        mock_instance.set.return_value = True
+        mock_class.return_value = mock_instance
+        yield mock_instance
+
+
 @pytest.mark.django_db
 class TestSearchE2E:
     """검색 E2E 테스트."""
 
-    @patch("agent.nodes.execute.SaraminCrawler")
-    @patch("agent.nodes.parse.OllamaProvider")
-    async def test_full_search_flow(self, mock_ollama_class, mock_crawler_class, mock_job_postings):
+    @patch("api.views.run_agent")
+    async def test_full_search_flow(self, mock_run_agent, mock_cache, mock_agent_response):
         """검색 전체 플로우 테스트."""
-        mock_ollama = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.content = '{"role": "백엔드 개발자", "experience": 3, "skills": ["Python"], "location": "서울"}'
-        mock_ollama.chat.return_value = mock_response
-        mock_ollama_class.return_value = mock_ollama
-
-        mock_crawler = AsyncMock()
-        mock_crawler.search.return_value = mock_job_postings
-        mock_crawler_class.return_value = mock_crawler
+        mock_run_agent.return_value = mock_agent_response
 
         client = AsyncClient()
         response = await client.post(
@@ -71,19 +104,22 @@ class TestSearchE2E:
         assert "search_time_ms" in data
         assert data["search_time_ms"] >= 0
 
-    @patch("agent.nodes.execute.SaraminCrawler")
-    @patch("agent.nodes.parse.OllamaProvider")
-    async def test_search_no_results(self, mock_ollama_class, mock_crawler_class):
+    @patch("api.views.run_agent")
+    async def test_search_no_results(self, mock_run_agent, mock_cache):
         """검색 결과 없음 테스트."""
-        mock_ollama = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.content = '{"role": "희귀직종", "experience": null, "skills": [], "location": null}'
-        mock_ollama.chat.return_value = mock_response
-        mock_ollama_class.return_value = mock_ollama
-
-        mock_crawler = AsyncMock()
-        mock_crawler.search.return_value = []
-        mock_crawler_class.return_value = mock_crawler
+        mock_run_agent.return_value = AgentResponse(
+            query="희귀한 직종",
+            parsed_conditions=ParsedQuery(
+                role="희귀직종",
+                experience=None,
+                skills=[],
+                location=None,
+            ),
+            response="검색 결과가 없습니다.",
+            results=[],
+            total_count=0,
+            search_time_ms=0,
+        )
 
         client = AsyncClient()
         response = await client.post(
@@ -119,9 +155,8 @@ class TestSearchE2E:
 
         assert response.status_code == HTTPStatus.BAD_REQUEST
 
-    @patch("agent.nodes.execute.SaraminCrawler")
-    @patch("agent.nodes.parse.OllamaProvider")
-    async def test_search_various_keywords(self, mock_ollama_class, mock_crawler_class, mock_job_postings):
+    @patch("api.views.run_agent")
+    async def test_search_various_keywords(self, mock_run_agent, mock_cache, mock_agent_response):
         """다양한 검색어 테스트."""
         test_queries = [
             "프론트엔드 개발자",
@@ -130,15 +165,7 @@ class TestSearchE2E:
             "Python Django 개발",
         ]
 
-        mock_ollama = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.content = '{"role": "개발자", "experience": null, "skills": [], "location": null}'
-        mock_ollama.chat.return_value = mock_response
-        mock_ollama_class.return_value = mock_ollama
-
-        mock_crawler = AsyncMock()
-        mock_crawler.search.return_value = mock_job_postings
-        mock_crawler_class.return_value = mock_crawler
+        mock_run_agent.return_value = mock_agent_response
 
         client = AsyncClient()
 
