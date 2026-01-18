@@ -5,14 +5,23 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+    env_file:
+      - .env
     environment:
-      - DEBUG=True
+      # Docker 내부 네트워크용 오버라이드
       - OLLAMA_HOST=http://ollama:11434
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
     security_opt:
       - seccomp:unconfined
     shm_size: '2gb'
     depends_on:
       ollama:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   ollama:
@@ -29,5 +38,77 @@ services:
       retries: 30
       start_period: 10s
 
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: jobcrawler
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  celery-worker:
+    build: .
+    command: celery -A config worker -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      # Docker 내부 네트워크용 오버라이드
+      - OLLAMA_HOST=http://ollama:11434
+      - DB_HOST=db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    security_opt:
+      - seccomp:unconfined
+    shm_size: '2gb'
+    depends_on:
+      ollama:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build: .
+    command: celery -A config beat -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      # Docker 내부 네트워크용 오버라이드
+      - DB_HOST=db
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   ollama_data:
+  postgres_data:
+  redis_data:
