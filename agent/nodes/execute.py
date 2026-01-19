@@ -9,7 +9,7 @@ from agent.state import AgentState
 from agent.tools.rag import RAGTool
 from apps.jobs.services import JobService
 from core.performance import PerformanceTracker
-from crawlers import CrawlerError, JobKoreaCrawler, SaraminCrawler
+from crawlers import CrawlerError, CrawlerService
 from crawlers.models import JobPosting as CrawlerJobPosting
 from crawlers.utils import CRAWLER_TIMEOUT, crawler_semaphore
 
@@ -30,7 +30,7 @@ async def execute_node(state: AgentState) -> dict:
     """
     plan = SearchPlan(**state["search_plan"])
 
-    logger.info(f"Executing search: keyword='{plan.search_keyword}', max_pages={plan.max_pages}")
+    logger.info(f"Executing search: keyword='{plan.search_keyword}'")
 
     if DB_SAVE_ENABLED:
         rag_results = await _search_from_rag(plan.search_keyword)
@@ -41,38 +41,20 @@ async def execute_node(state: AgentState) -> dict:
     try:
         async with asyncio.timeout(CRAWLER_TIMEOUT):
             async with crawler_semaphore:
-                return await _execute_crawling(plan.search_keyword, plan.max_pages)
+                return await _execute_crawling(plan.search_keyword)
     except TimeoutError:
         logger.warning("Crawler semaphore timeout - server busy")
         return ExecuteResult(crawl_error=SERVER_BUSY_MESSAGE).model_dump()
 
 
-async def _execute_crawling(keyword: str, max_pages: int) -> dict:
-    """실제 크롤링 수행 (사람인 + 잡코리아 병렬)."""
+async def _execute_crawling(keyword: str) -> dict:
+    """실제 크롤링 수행 (사람인 + 잡코리아 병렬, 페이지 1만)."""
     tracker = PerformanceTracker("crawling").start()
 
     try:
-        saramin_crawler = SaraminCrawler()
-        jobkorea_crawler = JobKoreaCrawler()
-
-        saramin_results, jobkorea_results = await asyncio.gather(
-            saramin_crawler.search(keyword, max_pages=max_pages),
-            jobkorea_crawler.search(keyword, max_pages=max_pages),
-            return_exceptions=True,
-        )
+        crawler_service = CrawlerService()
+        all_results = await crawler_service.crawl_page(keyword, page=1)
         tracker.checkpoint("parallel_crawl")
-
-        all_results: list[CrawlerJobPosting] = []
-
-        if isinstance(saramin_results, Exception):
-            logger.error(f"Saramin crawler error: {saramin_results}")
-        else:
-            all_results.extend(saramin_results)
-
-        if isinstance(jobkorea_results, Exception):
-            logger.error(f"JobKorea crawler error: {jobkorea_results}")
-        else:
-            all_results.extend(jobkorea_results)
 
         if DB_SAVE_ENABLED and all_results:
             await _save_to_db(all_results)

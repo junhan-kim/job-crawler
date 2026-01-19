@@ -1,5 +1,6 @@
 """Celery 크롤링 태스크."""
 
+import asyncio
 import logging
 from datetime import timedelta
 
@@ -11,6 +12,7 @@ from django.utils import timezone
 from apps.jobs.services import JobService
 from apps.search.models import SearchHistory
 from crawlers import JobKoreaCrawler, SaraminCrawler
+from crawlers.utils import get_random_delay
 
 from .constants import POPULAR_KEYWORDS, RECENT_SEARCH_HOURS, RECENT_SEARCH_LIMIT
 
@@ -29,33 +31,41 @@ def crawl_popular_keywords():
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)
-def crawl_and_save(self, keyword: str, max_pages: int | None = None):
+def crawl_and_save(self, keyword: str):
     """
     단일 키워드 크롤링 후 DB 저장.
 
     Celery task는 동기이므로 async 코드를 래핑.
     """
     try:
-        async_to_sync(_crawl_and_save_async)(keyword, max_pages)
+        async_to_sync(_crawl_and_save_async)(keyword)
         logger.info(f"Completed crawl for: {keyword}")
     except Exception as error:
         logger.error(f"Crawl failed for {keyword}: {error}")
         raise self.retry(exc=error) from error
 
 
-async def _crawl_and_save_async(keyword: str, max_pages: int | None):
+async def _crawl_and_save_async(keyword: str):
     """실제 비동기 크롤링 로직."""
     job_service = JobService()
-    pages = max_pages if max_pages is not None else settings.BATCH_CRAWL_MAX_PAGES
+    max_pages = settings.BATCH_CRAWL_MAX_PAGES
 
     crawlers = [SaraminCrawler(), JobKoreaCrawler()]
 
     for crawler in crawlers:
+        total_jobs = 0
         try:
-            results = await crawler.search(keyword, max_pages=pages)
-            for job in results:
-                await job_service.save_job(job)
-            logger.info(f"{crawler.__class__.__name__}: {len(results)} jobs for '{keyword}'")
+            for page_num in range(1, max_pages + 1):
+                results = await crawler.search(keyword, page=page_num)
+                for job in results:
+                    await job_service.save_job(job)
+                total_jobs += len(results)
+
+                if page_num < max_pages:
+                    delay = get_random_delay()
+                    await asyncio.sleep(delay)
+
+            logger.info(f"{crawler.__class__.__name__}: {total_jobs} jobs for '{keyword}'")
         except Exception as error:
             logger.error(f"{crawler.__class__.__name__} crawl failed for {keyword}: {error}")
 

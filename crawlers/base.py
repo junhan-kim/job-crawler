@@ -23,13 +23,13 @@ class BaseCrawler(ABC):
         return self.source.value
 
     @abstractmethod
-    async def search(self, keyword: str, max_pages: int = 1) -> list[JobPosting]:
+    async def search(self, keyword: str, page: int = 1) -> list[JobPosting]:
         """
         키워드로 채용 공고 검색.
 
         Args:
             keyword: 검색 키워드
-            max_pages: 크롤링할 최대 페이지 수
+            page: 크롤링할 페이지 번호
 
         Returns:
             JobPosting 리스트

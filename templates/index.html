@@ -90,10 +90,11 @@
         const resultDiv = document.getElementById('result');
         const historyDiv = document.getElementById('history');
 
-        const ITEMS_PER_PAGE = 10;
         let currentData = null;
-        let displayedCount = 0;
+        let currentKeyword = null;
+        let currentPage = 1;
         let isLoadingMore = false;
+        let hasMorePages = true;
 
         function renderLoading() {
             return '<div class="loading"><span class="loading-spinner"></span>채용 공고를 검색하고 있습니다...</div>';
@@ -140,12 +141,13 @@
             `;
         }
 
-        function renderResults(data, jobs) {
+        function renderResults(data) {
+            const jobs = data.results || [];
             return `
                 <div class="response-box">
                     <div class="response-header">
                         <h2>검색 결과</h2>
-                        <span class="result-count">${data.total_count}건</span>
+                        <span class="result-count" id="result-count">${data.total_count}건</span>
                     </div>
                     <div>${escapeHtml(data.response)}</div>
                     ${renderParsedConditions(data.parsed_conditions)}
@@ -162,28 +164,47 @@
             return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         }
 
-        function loadMoreItems() {
-            if (!currentData || isLoadingMore) return;
-
-            const allJobs = currentData.results || [];
-            if (displayedCount >= allJobs.length) return;
+        async function loadMoreItems() {
+            if (!currentKeyword || isLoadingMore || !hasMorePages) return;
 
             isLoadingMore = true;
             const loadMoreArea = document.getElementById('load-more-area');
             loadMoreArea.innerHTML = '<div class="load-more"><span class="load-more-spinner"></span></div>';
 
-            setTimeout(() => {
-                const nextJobs = allJobs.slice(displayedCount, displayedCount + ITEMS_PER_PAGE);
-                displayedCount += nextJobs.length;
+            try {
+                const nextPage = currentPage + 1;
+                const res = await fetch('/api/search/more/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keyword: currentKeyword, page: nextPage })
+                });
+                const data = await res.json();
 
-                const jobList = document.getElementById('job-list');
-                if (jobList) {
-                    jobList.insertAdjacentHTML('beforeend', nextJobs.map(renderJobCard).join(''));
+                if (data.error) {
+                    loadMoreArea.innerHTML = `<div class="load-more" style="color: #dc2626;">${escapeHtml(data.error.message || '추가 로드 실패')}</div>`;
+                    return;
                 }
 
-                loadMoreArea.innerHTML = '';
+                currentPage = nextPage;
+                hasMorePages = data.has_more;
+
+                const jobList = document.getElementById('job-list');
+                if (jobList && data.results && data.results.length > 0) {
+                    jobList.insertAdjacentHTML('beforeend', data.results.map(renderJobCard).join(''));
+
+                    const resultCount = document.getElementById('result-count');
+                    if (resultCount && currentData) {
+                        currentData.total_count += data.total_count;
+                        resultCount.textContent = `${currentData.total_count}건`;
+                    }
+                }
+
+                loadMoreArea.innerHTML = hasMorePages ? '' : '<div class="load-more" style="color: #6b7280;">모든 결과를 불러왔습니다.</div>';
+            } catch (e) {
+                loadMoreArea.innerHTML = `<div class="load-more" style="color: #dc2626;">추가 로드 실패: ${escapeHtml(e.message)}</div>`;
+            } finally {
                 isLoadingMore = false;
-            }, 200);
+            }
         }
 
         function handleScroll() {
@@ -206,7 +227,9 @@
             searchBtn.disabled = true;
             resultDiv.innerHTML = renderLoading();
             currentData = null;
-            displayedCount = 0;
+            currentKeyword = null;
+            currentPage = 1;
+            hasMorePages = true;
 
             try {
                 const res = await fetch('/api/search/', {
@@ -220,9 +243,8 @@
                     resultDiv.innerHTML = renderError(data.error);
                 } else {
                     currentData = data;
-                    const initialJobs = (data.results || []).slice(0, ITEMS_PER_PAGE);
-                    displayedCount = initialJobs.length;
-                    resultDiv.innerHTML = renderResults(data, initialJobs);
+                    currentKeyword = extractKeyword(data);
+                    resultDiv.innerHTML = renderResults(data);
                     loadHistory();
                 }
             } catch (e) {
@@ -230,6 +252,18 @@
             } finally {
                 searchBtn.disabled = false;
             }
+        }
+
+        function extractKeyword(data) {
+            if (data.parsed_conditions) {
+                const parts = [];
+                if (data.parsed_conditions.role) parts.push(data.parsed_conditions.role);
+                if (data.parsed_conditions.skills && data.parsed_conditions.skills.length > 0) {
+                    parts.push(...data.parsed_conditions.skills);
+                }
+                if (parts.length > 0) return parts.join(' ');
+            }
+            return data.query || '';
         }
 
         searchBtn.addEventListener('click', search);

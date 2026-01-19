@@ -4,6 +4,7 @@ from .exceptions import CrawlerBlockedError, CrawlerError, CrawlerTimeoutError
 from .jobkorea import JobKoreaCrawler
 from .models import JobPosting, JobSource
 from .saramin import SaraminCrawler
+from .services import CrawlerService
 
 __all__ = [
     "JobPosting",
@@ -16,4 +17,5 @@ __all__ = [
     "CrawlerError",
     "CrawlerBlockedError",
     "CrawlerTimeoutError",
+    "CrawlerService",
 ]

@@ -6,12 +6,29 @@ from .exceptions import QueryRequiredError, QueryTooLongError
 
 class RequestField:
     QUERY = "query"
+    KEYWORD = "keyword"
+    PAGE = "page"
 
 
 class SearchRequestSerializer(serializers.Serializer):
     query = serializers.CharField()
 
     def validate_query(self, value):
+        value = value.strip()
+        if not value:
+            raise QueryRequiredError()
+        if len(value) > settings.SEARCH_QUERY_MAX_LENGTH:
+            raise QueryTooLongError()
+        return value
+
+
+class LoadMoreRequestSerializer(serializers.Serializer):
+    """무한 스크롤 추가 로드 요청."""
+
+    keyword = serializers.CharField()
+    page = serializers.IntegerField(min_value=1)
+
+    def validate_keyword(self, value):
         value = value.strip()
         if not value:
             raise QueryRequiredError()
@@ -42,6 +59,15 @@ class JobPostingSerializer(serializers.Serializer):
     skills = serializers.ListField(child=serializers.CharField(), default=list)
     deadline = serializers.CharField(allow_null=True, allow_blank=True)
     posted_at = serializers.CharField(allow_null=True, allow_blank=True)
+
+
+class LoadMoreResponseSerializer(serializers.Serializer):
+    """무한 스크롤 추가 로드 응답."""
+
+    results = JobPostingSerializer(many=True)
+    total_count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    has_more = serializers.BooleanField()
 
 
 class SearchResponseSerializer(serializers.Serializer):

@@ -37,6 +37,11 @@ class LLMError(APIException):
     default_detail = "LLM service error"
 
 
+class ServerBusyError(APIException):
+    status_code = HTTPStatus.SERVICE_UNAVAILABLE
+    default_detail = "Server is busy. Please try again later."
+
+
 def custom_exception_handler(exc, context):
     response = exception_handler(exc, context)
 

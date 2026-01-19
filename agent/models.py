@@ -31,7 +31,6 @@ class SearchPlan(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     search_keyword: str = ""
     filters: SearchFilters = Field(default_factory=SearchFilters)
-    max_pages: int = 1
 
 
 class JobSearchResult(BaseModel):

@@ -2,8 +2,6 @@
 
 import logging
 
-from django.conf import settings
-
 from agent.models import ParsedQuery, SearchFilters, SearchPlan
 from agent.state import AgentState
 
@@ -54,5 +52,4 @@ def _create_search_plan(
             experience=conditions.experience,
             location=conditions.location,
         ),
-        max_pages=settings.AGENT_CRAWL_MAX_PAGES,
     )

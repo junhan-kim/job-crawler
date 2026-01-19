@@ -1,6 +1,5 @@
 """잡코리아 크롤러 구현."""
 
-import asyncio
 import logging
 import re
 
@@ -8,7 +7,7 @@ from .base import BaseCrawler
 from .browser import get_browser_pool
 from .exceptions import CrawlerBlockedError
 from .models import JobPosting, JobSource
-from .utils import get_random_delay, rate_limiter, retry_on_timeout
+from .utils import rate_limiter, retry_on_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -92,13 +91,13 @@ class JobKoreaCrawler(BaseCrawler):
         return JobSource.JOBKOREA
 
     @retry_on_timeout
-    async def search(self, keyword: str, max_pages: int = 1) -> list[JobPosting]:
+    async def search(self, keyword: str, page: int = 1) -> list[JobPosting]:
         """
         잡코리아에서 채용공고 검색.
 
         Args:
             keyword: 검색 키워드
-            max_pages: 크롤링할 최대 페이지 수
+            page: 크롤링할 페이지 번호
 
         Returns:
             JobPosting 리스트
@@ -106,71 +105,47 @@ class JobKoreaCrawler(BaseCrawler):
         Raises:
             CrawlerBlockedError: 차단 감지 시
         """
-        seen_urls: set[str] = set()
-
         pool = await get_browser_pool()
         context = await pool.get_context()
 
         try:
-            page = await context.new_page()
-            await self._apply_stealth(page)
-            jobs = await self._crawl_pages(page, keyword, max_pages, seen_urls)
+            browser_page = await context.new_page()
+            await self._apply_stealth(browser_page)
+
+            async with rate_limiter:
+                jobs = await self._crawl_single_page(browser_page, keyword, page)
         finally:
             await context.close()
 
         logger.info(f"Total jobs collected: {len(jobs)}")
         return jobs
 
-    async def _crawl_pages(
-        self, page, keyword: str, max_pages: int, seen_urls: set[str]
-    ) -> list[JobPosting]:
-        """페이지별 크롤링 수행."""
-        jobs: list[JobPosting] = []
-
-        for page_num in range(1, max_pages + 1):
-            async with rate_limiter:
-                page_jobs = await self._crawl_single_page(
-                    page, keyword, page_num, max_pages, seen_urls
-                )
-                jobs.extend(page_jobs)
-
-            if page_num < max_pages:
-                delay = get_random_delay()
-                logger.debug(f"Waiting {delay:.1f}s before next page")
-                await asyncio.sleep(delay)
-
-        return jobs
-
     async def _crawl_single_page(
-        self, page, keyword: str, page_num: int, max_pages: int, seen_urls: set[str]
+        self, browser_page, keyword: str, page: int
     ) -> list[JobPosting]:
         """단일 페이지 크롤링."""
-        url = f"{self.SEARCH_URL}?stext={keyword}&Page_No={page_num}"
-        logger.info(f"Crawling page {page_num}/{max_pages}: {url}")
+        url = f"{self.SEARCH_URL}?stext={keyword}&Page_No={page}"
+        logger.info(f"Crawling page {page}: {url}")
 
-        await page.goto(url, timeout=self.TIMEOUT_MS, wait_until="domcontentloaded")
-        await page.wait_for_timeout(self.PAGE_LOAD_WAIT_MS)
+        await browser_page.goto(url, timeout=self.TIMEOUT_MS, wait_until="domcontentloaded")
+        await browser_page.wait_for_timeout(self.PAGE_LOAD_WAIT_MS)
 
-        await self._check_blocked(page)
+        await self._check_blocked(browser_page)
 
-        job_data_list = await page.evaluate(self.JS_EXTRACT_JOBS)
+        job_data_list = await browser_page.evaluate(self.JS_EXTRACT_JOBS)
         logger.info(f"Found {len(job_data_list)} job cards")
 
         jobs = []
         for data in job_data_list:
-            if data["url"] in seen_urls:
-                continue
-            seen_urls.add(data["url"])
-
             job = self._parse_job_data(data)
             if job:
                 jobs.append(job)
 
         return jobs
 
-    async def _check_blocked(self, page) -> None:
+    async def _check_blocked(self, browser_page) -> None:
         """차단 여부 확인."""
-        content = await page.content()
+        content = await browser_page.content()
         content_lower = content.lower()
 
         for indicator in self.BLOCK_INDICATORS:

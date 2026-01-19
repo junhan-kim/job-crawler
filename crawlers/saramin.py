@@ -1,6 +1,5 @@
 """사람인 크롤러 구현."""
 
-import asyncio
 import logging
 import time
 
@@ -8,7 +7,7 @@ from .base import BaseCrawler
 from .browser import get_browser_pool
 from .exceptions import CrawlerBlockedError
 from .models import JobPosting, JobSource
-from .utils import get_random_delay, rate_limiter, retry_on_timeout
+from .utils import rate_limiter, retry_on_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +52,13 @@ class SaraminCrawler(BaseCrawler):
         return JobSource.SARAMIN
 
     @retry_on_timeout
-    async def search(self, keyword: str, max_pages: int = 1) -> list[JobPosting]:
+    async def search(self, keyword: str, page: int = 1) -> list[JobPosting]:
         """
         사람인에서 채용공고 검색.
 
         Args:
             keyword: 검색 키워드
-            max_pages: 크롤링할 최대 페이지 수
+            page: 크롤링할 페이지 번호
 
         Returns:
             JobPosting 리스트
@@ -77,63 +76,44 @@ class SaraminCrawler(BaseCrawler):
 
         try:
             t2 = time.perf_counter()
-            page = await context.new_page()
+            browser_page = await context.new_page()
             logger.debug(f"[TIMING] new_page: {time.perf_counter() - t2:.2f}s")
 
             t3 = time.perf_counter()
-            await self._apply_stealth(page)
+            await self._apply_stealth(browser_page)
             logger.debug(f"[TIMING] apply_stealth: {time.perf_counter() - t3:.2f}s")
 
-            jobs = await self._crawl_pages(page, keyword, max_pages)
+            async with rate_limiter:
+                jobs = await self._crawl_single_page(browser_page, keyword, page)
         finally:
             await context.close()
 
         logger.info(f"Total jobs collected: {len(jobs)}")
         return jobs
 
-    async def _crawl_pages(
-        self, page, keyword: str, max_pages: int
-    ) -> list[JobPosting]:
-        """페이지별 크롤링 수행."""
-        jobs: list[JobPosting] = []
-
-        for page_num in range(1, max_pages + 1):
-            t_rate = time.perf_counter()
-            async with rate_limiter:
-                logger.debug(f"[TIMING] rate_limiter wait: {time.perf_counter() - t_rate:.2f}s")
-                page_jobs = await self._crawl_single_page(page, keyword, page_num, max_pages)
-                jobs.extend(page_jobs)
-
-            if page_num < max_pages:
-                delay = get_random_delay()
-                logger.debug(f"Waiting {delay:.1f}s before next page")
-                await asyncio.sleep(delay)
-
-        return jobs
-
     async def _crawl_single_page(
-        self, page, keyword: str, page_num: int, max_pages: int
+        self, browser_page, keyword: str, page: int
     ) -> list[JobPosting]:
         """단일 페이지 크롤링."""
-        url = f"{self.SEARCH_URL}?searchword={keyword}&recruitPage={page_num}"
-        logger.info(f"Crawling page {page_num}/{max_pages}: {url}")
+        url = f"{self.SEARCH_URL}?searchword={keyword}&recruitPage={page}"
+        logger.info(f"Crawling page {page}: {url}")
 
         t0 = time.perf_counter()
-        await page.goto(url, timeout=self.TIMEOUT_MS, wait_until="domcontentloaded")
+        await browser_page.goto(url, timeout=self.TIMEOUT_MS, wait_until="domcontentloaded")
         logger.debug(f"[TIMING] page.goto: {time.perf_counter() - t0:.2f}s")
 
         t1 = time.perf_counter()
-        await page.wait_for_selector(
+        await browser_page.wait_for_selector(
             self.SELECTORS["job_card"], timeout=self.PAGE_LOAD_WAIT_MS
         )
         logger.debug(f"[TIMING] wait_for_selector: {time.perf_counter() - t1:.2f}s")
 
         t2 = time.perf_counter()
-        await self._check_blocked(page)
+        await self._check_blocked(browser_page)
         logger.debug(f"[TIMING] check_blocked: {time.perf_counter() - t2:.2f}s")
 
         t3 = time.perf_counter()
-        items = await page.query_selector_all(self.SELECTORS["job_card"])
+        items = await browser_page.query_selector_all(self.SELECTORS["job_card"])
         logger.debug(f"[TIMING] query_selector_all: {time.perf_counter() - t3:.2f}s")
         logger.info(f"Found {len(items)} job cards")
 
@@ -145,9 +125,9 @@ class SaraminCrawler(BaseCrawler):
 
         return jobs
 
-    async def _check_blocked(self, page) -> None:
+    async def _check_blocked(self, browser_page) -> None:
         """차단 여부 확인."""
-        content = await page.content()
+        content = await browser_page.content()
         content_lower = content.lower()
 
         for indicator in self.BLOCK_INDICATORS:
