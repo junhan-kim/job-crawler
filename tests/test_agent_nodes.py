@@ -30,7 +30,7 @@ class TestPlanNode:
         keywords = ["백엔드", "Python"]
         conditions = ParsedQuery(experience=3, location="서울")
 
-        plan = _create_search_plan(keywords, conditions)
+        plan = _create_search_plan(keywords, conditions, original_query="백엔드 Python 3년차")
 
         assert plan.keywords == keywords
         assert plan.search_keyword == "백엔드 Python"

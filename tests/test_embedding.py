@@ -29,7 +29,7 @@ class TestEmbeddingService:
         assert "3년 이상" in text
 
     def test_create_job_text_with_missing_fields(self):
-        """필드가 없는 경우 기본값 테스트."""
+        """필드가 없는 경우 해당 필드 제외 테스트."""
         from core.embedding_service import EmbeddingService
 
         service = EmbeddingService()
@@ -43,9 +43,7 @@ class TestEmbeddingService:
 
         text = service.create_job_text(job)
 
-        assert "개발자" in text
-        assert "미정" in text  # location과 skills 기본값
-        assert "무관" in text  # experience 기본값
+        assert text == "개발자 회사"
 
     def test_create_job_node(self):
         """LlamaIndex 노드 생성 테스트."""
