@@ -170,11 +170,11 @@ CELERY_TIMEZONE = 'Asia/Seoul'
 CELERY_BEAT_SCHEDULE = {
     'crawl-popular-keywords': {
         'task': 'apps.jobs.tasks.crawl_popular_keywords',
-        'schedule': crontab(hour='*/6'),
+        'schedule': crontab(minute=0, hour='*/6'),
     },
     'crawl-recent-search-keywords': {
         'task': 'apps.jobs.tasks.crawl_recent_search_keywords',
-        'schedule': crontab(hour='*/1'),
+        'schedule': crontab(minute=0, hour='*/1'),
     },
 }
 

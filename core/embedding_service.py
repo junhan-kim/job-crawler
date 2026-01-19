@@ -19,14 +19,21 @@ class EmbeddingService:
 
     def create_job_text(self, job: JobPosting) -> str:
         """채용공고를 임베딩할 텍스트로 변환."""
-        skills_str = ", ".join(job.skills) if job.skills else "미정"
-        return "\n".join([
-            f"제목: {job.title}",
-            f"회사: {job.company}",
-            f"위치: {job.location or '미정'}",
-            f"기술: {skills_str}",
-            f"경력: {job.experience or '무관'}",
-        ])
+        parts = [job.title]
+
+        if job.company:
+            parts.append(job.company)
+
+        if job.skills:
+            parts.append(", ".join(job.skills))
+
+        if job.location:
+            parts.append(job.location)
+
+        if job.experience:
+            parts.append(job.experience)
+
+        return " ".join(parts)
 
     def create_job_node(self, job: JobPosting) -> TextNode:
         """채용공고를 LlamaIndex 노드로 변환."""

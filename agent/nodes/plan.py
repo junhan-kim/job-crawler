@@ -14,14 +14,15 @@ async def plan_node(state: AgentState) -> dict:
     """
     파싱된 조건을 바탕으로 검색 전략 수립.
 
-    Input: parsed_conditions
+    Input: parsed_conditions, query
     Output: search_plan
     """
     conditions = ParsedQuery(**state["parsed_conditions"])
+    original_query = state.get("query", "")
     logger.info(f"Planning search with conditions: {conditions}")
 
     keywords = _build_keywords(conditions)
-    search_plan = _create_search_plan(keywords, conditions)
+    search_plan = _create_search_plan(keywords, conditions, original_query)
 
     logger.info(f"Search plan: {search_plan.model_dump()}")
     return {"search_plan": search_plan.model_dump()}
@@ -40,11 +41,15 @@ def _build_keywords(conditions: ParsedQuery) -> list[str]:
     return keywords
 
 
-def _create_search_plan(keywords: list[str], conditions: ParsedQuery) -> SearchPlan:
+def _create_search_plan(
+    keywords: list[str], conditions: ParsedQuery, original_query: str
+) -> SearchPlan:
     """검색 계획 생성."""
+    search_keyword = " ".join(keywords) if keywords else original_query
+
     return SearchPlan(
         keywords=keywords,
-        search_keyword=" ".join(keywords),
+        search_keyword=search_keyword,
         filters=SearchFilters(
             experience=conditions.experience,
             location=conditions.location,

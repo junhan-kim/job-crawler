@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ParsedQuery(BaseModel):
@@ -8,6 +8,14 @@ class ParsedQuery(BaseModel):
     experience: int | None = Field(None, description="경력 연차 숫자")
     skills: list[str] = Field(default_factory=list, description="기술 스택 목록")
     location: str | None = Field(None, description="근무 지역")
+
+    @field_validator("skills", mode="before")
+    @classmethod
+    def skills_null_to_empty_list(cls, value):
+        """LLM이 null을 반환할 경우 빈 리스트로 변환."""
+        if value is None:
+            return []
+        return value
 
 
 class SearchFilters(BaseModel):

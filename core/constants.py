@@ -1,6 +1,6 @@
 """core 모듈 상수 정의."""
 
-EMBEDDING_MODEL = "nomic-embed-text"
-EMBEDDING_DIMENSIONS = 768
+EMBEDDING_MODEL = "mxbai-embed-large"
+EMBEDDING_DIMENSIONS = 1024
 
 LLM_CACHE_TTL_SECONDS = 86400
