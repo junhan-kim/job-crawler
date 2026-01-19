@@ -8,11 +8,11 @@ LLM 기반 채용 정보 검색 에이전트
 
 | 문서 | 설명 |
 |------|------|
-| [docs/README.md](./docs/README.md) | 문서 인덱스 |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 시스템 아키텍처 |
 | [docs/TECH_STACK.md](./docs/TECH_STACK.md) | 기술 스택 |
 | [docs/PROBLEMS.md](./docs/PROBLEMS.md) | 예상 문제점 및 해결 전략 |
 | [docs/POST_MVP.md](./docs/POST_MVP.md) | MVP 이후 개선 사항 |
+| [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) | 트러블슈팅 기록 |
 
 ---
 
