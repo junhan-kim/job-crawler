@@ -2,6 +2,7 @@
 
 import logging
 import time
+from urllib.parse import quote
 
 from .base import BaseCrawler
 from .browser import get_browser_pool
@@ -95,7 +96,7 @@ class SaraminCrawler(BaseCrawler):
         self, browser_page, keyword: str, page: int
     ) -> list[JobPosting]:
         """단일 페이지 크롤링."""
-        url = f"{self.SEARCH_URL}?searchword={keyword}&recruitPage={page}"
+        url = f"{self.SEARCH_URL}?searchword={quote(keyword)}&recruitPage={page}"
         logger.info(f"Crawling page {page}: {url}")
 
         t0 = time.perf_counter()

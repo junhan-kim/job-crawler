@@ -9,6 +9,7 @@ from pgvector.django import CosineDistance
 
 from agent.models import JobSearchResult
 from apps.jobs.models import JobPosting
+from core.constants import VECTOR_SEARCH_DISTANCE_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,9 @@ class RAGTool:
             if company := filters.get("company"):
                 queryset = queryset.filter(company__icontains=company)
 
-        queryset = queryset.order_by("distance")[:top_k]
+        queryset = queryset.filter(
+            distance__lt=VECTOR_SEARCH_DISTANCE_THRESHOLD
+        ).order_by("distance")[:top_k]
 
         results = []
         async for job in queryset:

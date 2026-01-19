@@ -2,6 +2,7 @@
 
 import logging
 import re
+from urllib.parse import quote
 
 from .base import BaseCrawler
 from .browser import get_browser_pool
@@ -124,7 +125,7 @@ class JobKoreaCrawler(BaseCrawler):
         self, browser_page, keyword: str, page: int
     ) -> list[JobPosting]:
         """단일 페이지 크롤링."""
-        url = f"{self.SEARCH_URL}?stext={keyword}&Page_No={page}"
+        url = f"{self.SEARCH_URL}?stext={quote(keyword)}&Page_No={page}"
         logger.info(f"Crawling page {page}: {url}")
 
         await browser_page.goto(url, timeout=self.TIMEOUT_MS, wait_until="domcontentloaded")

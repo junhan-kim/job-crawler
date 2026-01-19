@@ -3,8 +3,6 @@ services:
     build: .
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app
     env_file:
       - .env
     environment:
@@ -30,9 +28,9 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && ollama pull nomic-embed-text && wait"]
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && ollama pull mxbai-embed-large && wait"]
     healthcheck:
-      test: ["CMD-SHELL", "ollama list | grep -q llama3.2 && ollama list | grep -q nomic-embed-text"]
+      test: ["CMD-SHELL", "ollama list | grep -q llama3.2 && ollama list | grep -q mxbai-embed-large"]
       interval: 10s
       timeout: 30s
       retries: 30
@@ -71,6 +69,7 @@ services:
     command: celery -A config worker -l info
     volumes:
       - .:/app
+      - /app/.venv
     env_file:
       - .env
     environment:
@@ -95,6 +94,7 @@ services:
     command: celery -A config beat -l info
     volumes:
       - .:/app
+      - /app/.venv
     env_file:
       - .env
     environment:
