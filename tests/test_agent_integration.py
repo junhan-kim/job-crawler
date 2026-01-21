@@ -70,7 +70,7 @@ def mock_agent_response(mock_job_postings):
 @pytest.fixture
 def mock_cache():
     """Redis 캐시 모킹."""
-    with patch("api.views.SearchResultCache") as mock_class:
+    with patch("api.views.search.SearchResultCache") as mock_class:
         mock_instance = AsyncMock()
         mock_instance.get.return_value = None
         mock_instance.set.return_value = True
@@ -82,7 +82,7 @@ def mock_cache():
 class TestSearchE2E:
     """검색 E2E 테스트."""
 
-    @patch("api.views.run_agent")
+    @patch("api.views.search.run_agent")
     async def test_full_search_flow(self, mock_run_agent, mock_cache, mock_agent_response):
         """검색 전체 플로우 테스트."""
         mock_run_agent.return_value = mock_agent_response
@@ -104,7 +104,7 @@ class TestSearchE2E:
         assert "search_time_ms" in data
         assert data["search_time_ms"] >= 0
 
-    @patch("api.views.run_agent")
+    @patch("api.views.search.run_agent")
     async def test_search_no_results(self, mock_run_agent, mock_cache):
         """검색 결과 없음 테스트."""
         mock_run_agent.return_value = AgentResponse(
@@ -155,7 +155,7 @@ class TestSearchE2E:
 
         assert response.status_code == HTTPStatus.BAD_REQUEST
 
-    @patch("api.views.run_agent")
+    @patch("api.views.search.run_agent")
     async def test_search_various_keywords(self, mock_run_agent, mock_cache, mock_agent_response):
         """다양한 검색어 테스트."""
         test_queries = [

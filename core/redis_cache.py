@@ -7,8 +7,6 @@ from typing import Any
 
 from django.conf import settings
 
-from core.constants import LLM_CACHE_TTL_SECONDS
-
 logger = logging.getLogger(__name__)
 
 CACHE_TTL = 3600
@@ -126,7 +124,7 @@ def init_llm_cache() -> None:
         from langchain_core.globals import set_llm_cache
 
         redis_client = redis.from_url(settings.REDIS_URL)
-        set_llm_cache(RedisCache(redis_=redis_client, ttl=LLM_CACHE_TTL_SECONDS))
+        set_llm_cache(RedisCache(redis_=redis_client, ttl=settings.LLM_CACHE_TTL_SECONDS))
         logger.info("LLM cache initialized with Redis")
 
     except ImportError as error:

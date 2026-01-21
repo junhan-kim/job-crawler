@@ -1,24 +1,21 @@
 class ParsePrompt:
     """채용 검색 쿼리 파싱 프롬프트."""
 
-    TEMPLATE = """Extract job search info from the user query. Output JSON only.
-
-Rules:
-- role: string or null (job position like backend, frontend, developer)
-- experience: number or null (years of experience, extract number only)
-- skills: array of strings (technologies/languages mentioned, e.g. ["Python"])
-- location: string or null (city/region in Korean)
-- If not mentioned, use null or empty array []
+    TEMPLATE = """Extract ONLY mentioned info. Output JSON.
 
 Examples:
-- "백엔드 3년차" -> {{"role": "백엔드", "experience": 3, "skills": [], "location": null}}
-- "python 개발자" -> {{"role": "개발자", "experience": null, "skills": ["Python"], "location": null}}
-- "서울 react 프론트엔드" -> {{"role": "프론트엔드", "experience": null, "skills": ["React"], "location": "서울"}}
-- "java spring 5년" -> {{"role": null, "experience": 5, "skills": ["Java", "Spring"], "location": null}}
+Q: "python 서울 3년" -> {{"role": null, "experience": 3, "skills": ["Python"], "location": "서울"}}
+Q: "백엔드 개발자" -> {{"role": "backend", "experience": null, "skills": [], "location": null}}
+Q: "react 프론트엔드" -> {{"role": "frontend", "experience": null, "skills": ["React"], "location": null}}
+Q: "spring boot java 5년" -> {{"role": null, "experience": 5, "skills": ["Spring Boot", "Java"], "location": null}}
+Q: "개발자" -> {{"role": "developer", "experience": null, "skills": [], "location": null}}
+Q: "AI 엔지니어" -> {{"role": "developer", "experience": null, "skills": ["AI"], "location": null}}
+Q: "데이터 분석가" -> {{"role": "developer", "experience": null, "skills": [], "location": null}}
 
-User query: {query}
+role must be: backend, frontend, developer, or null
+Do NOT add skills not in the query.
 
-JSON:"""
+Q: "{query}" ->"""
 
     @classmethod
     def format(cls, query: str) -> str:

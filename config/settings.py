@@ -27,8 +27,18 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
 # LLM
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://ollama:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.2')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'huihui_ai/kanana-nano-abliterated')
 OLLAMA_TIMEOUT = int(os.getenv('OLLAMA_TIMEOUT', '60'))
+
+# Embedding
+EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'mxbai-embed-large')
+EMBEDDING_DIMENSIONS = 1024
+
+# Vector Search
+VECTOR_SEARCH_DISTANCE_THRESHOLD = 0.25
+
+# Cache
+LLM_CACHE_TTL_SECONDS = 86400
 
 # Crawler
 CRAWLER_LOCALE = os.getenv('CRAWLER_LOCALE', 'ko-KR')

@@ -1,10 +1,8 @@
 """LlamaIndex 전역 설정."""
 
-from django.conf import settings as django_settings
+from django.conf import settings
 from llama_index.core import Settings
 from llama_index.embeddings.ollama import OllamaEmbedding
-
-from core.constants import EMBEDDING_MODEL
 
 _initialized = False
 
@@ -16,8 +14,8 @@ def init_llama_index():
         return
 
     Settings.embed_model = OllamaEmbedding(
-        model_name=EMBEDDING_MODEL,
-        base_url=django_settings.OLLAMA_HOST,
+        model_name=settings.EMBEDDING_MODEL,
+        base_url=settings.OLLAMA_HOST,
     )
     Settings.chunk_size = 512
     Settings.chunk_overlap = 50

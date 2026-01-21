@@ -3,13 +3,13 @@
 import logging
 from typing import Any
 
+from django.conf import settings
 from django.db.models import Q
 from llama_index.core import Settings
 from pgvector.django import CosineDistance
 
 from agent.models import JobSearchResult
 from apps.jobs.models import JobPosting
-from core.constants import VECTOR_SEARCH_DISTANCE_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class RAGTool:
                 queryset = queryset.filter(company__icontains=company)
 
         queryset = queryset.filter(
-            distance__lt=VECTOR_SEARCH_DISTANCE_THRESHOLD
+            distance__lt=settings.VECTOR_SEARCH_DISTANCE_THRESHOLD
         ).order_by("distance")[:top_k]
 
         results = []

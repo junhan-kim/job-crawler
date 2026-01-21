@@ -1,7 +1,6 @@
+from django.conf import settings
 from django.db import models
 from pgvector.django import VectorField
-
-from core.constants import EMBEDDING_DIMENSIONS
 
 
 class JobPosting(models.Model):
@@ -22,7 +21,7 @@ class JobPosting(models.Model):
     description = models.TextField(null=True, blank=True)
 
     # 벡터 임베딩 (pgvector)
-    embedding = VectorField(dimensions=EMBEDDING_DIMENSIONS, null=True, blank=True)
+    embedding = VectorField(dimensions=settings.EMBEDDING_DIMENSIONS, null=True, blank=True)
 
     # 메타 정보
     posted_at = models.DateTimeField(null=True, blank=True)

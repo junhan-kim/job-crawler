@@ -28,9 +28,11 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && ollama pull mxbai-embed-large && wait"]
+    env_file:
+      - .env
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull $OLLAMA_MODEL && ollama pull $EMBEDDING_MODEL && wait"]
     healthcheck:
-      test: ["CMD-SHELL", "ollama list | grep -q llama3.2 && ollama list | grep -q mxbai-embed-large"]
+      test: ["CMD-SHELL", "ollama list | grep -q $OLLAMA_MODEL && ollama list | grep -q $EMBEDDING_MODEL"]
       interval: 10s
       timeout: 30s
       retries: 30
