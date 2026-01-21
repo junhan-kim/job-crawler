@@ -6,15 +6,15 @@
     <title>Job Crawler</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; min-height: 100vh; padding-top: 140px; padding-left: 20px; padding-right: 20px; padding-bottom: 40px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; min-height: 100vh; padding-top: 150px; padding-left: 20px; padding-right: 20px; padding-bottom: 40px; }
 
-        .header { position: fixed; top: 0; left: 0; right: 0; background: #f5f5f5; padding: 20px 20px 0; z-index: 100; }
+        .header { position: fixed; top: 0; left: 0; right: 0; background: #f5f5f5; padding: 20px 20px 20px; z-index: 100; }
         .header h1 { text-align: center; margin-bottom: 20px; color: #333; }
-        .header .search-box { display: flex; gap: 10px; max-width: 896px; margin: 0 auto 20px; }
+        .header .search-box { display: flex; gap: 10px; max-width: 896px; margin: 0 auto 0; }
 
-        .layout { display: flex; gap: 24px; max-width: 1200px; margin: 0 auto; }
-        .main-content { flex: 1; min-width: 0; }
-        .sidebar { width: 280px; flex-shrink: 0; }
+        .layout { max-width: 900px; margin: 0 auto; }
+        .main-content { }
+        .sidebar { position: fixed; top: 150px; right: 20px; width: 280px; }
 
         h1 { text-align: center; margin-bottom: 30px; color: #333; }
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -56,21 +56,17 @@
         .load-more { text-align: center; padding: 20px; }
         .load-more-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #ddd; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
 
-        .history-section { position: sticky; top: 20px; }
+        .history-section { }
         .history-section h3 { font-size: 16px; color: #4b5563; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .history-list { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 100px); overflow-y: auto; }
+        .history-list { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 200px); overflow-y: auto; }
         .history-item { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb; cursor: pointer; transition: all 0.2s; }
         .history-item:hover { border-color: #2563eb; background: #f8fafc; }
         .history-query { font-size: 14px; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .history-meta { display: flex; gap: 12px; font-size: 12px; color: #6b7280; }
         .history-empty { text-align: center; padding: 20px; color: #9ca3af; font-size: 14px; background: white; border-radius: 8px; }
 
-        @media (max-width: 900px) {
-            .layout { flex-direction: column; }
-            .sidebar { width: 100%; order: 2; }
-            .history-section { position: static; }
-            .history-list { max-height: none; flex-direction: row; flex-wrap: wrap; }
-            .history-item { flex: 1; min-width: 200px; }
+        @media (max-width: 1200px) {
+            .sidebar { display: none; }
         }
     </style>
 </head>

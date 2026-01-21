@@ -28,4 +28,4 @@ class SearchHistoryService:
 
     async def get_recent(self, limit: int = 20) -> list[SearchHistory]:
         """최근 검색 히스토리 조회."""
-        return [h async for h in SearchHistory.objects.all()[:limit]]
+        return [h async for h in SearchHistory.objects.order_by("-created_at")[:limit]]
