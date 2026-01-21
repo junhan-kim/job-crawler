@@ -79,3 +79,39 @@ url = f"{self.SEARCH_URL}?searchword={quote(keyword)}&recruitPage={page}"
 ### 교훈
 - URL 파라미터에 특수문자 포함 가능성 항상 고려
 - `#`, `&`, `?`, `=` 등은 URL에서 특별한 의미를 가짐
+
+---
+
+## 2026-01-22: 한글 쿼리 파싱 시 LLM 할루시네이션
+
+### 문제
+"파이썬" 검색 시 Java 공고가 반환됨. LLM이 쿼리에 없는 스킬을 추가.
+
+### 원인 파악
+1. **llama3.2 3B 한국어 미지원**: 공식적으로 한국어 지원하지 않음, instruction following 불안정
+2. **임베딩 문제**: Python vs Java distance = 0.23 (threshold 0.25보다 낮음)
+3. **화이트리스트 할루시네이션**: 프롬프트에 스킬 목록 제공 시 모델이 전체 리스트 복사
+
+### 해결
+1. **LLM 모델 교체**: llama3.2 3B → Kanana (`huihui_ai/kanana-nano-abliterated`)
+   - 카카오의 한국어 특화 모델 (2.1B)
+
+2. **프롬프트 엔지니어링**:
+   - 화이트리스트 제거 (모델이 복사하므로)
+   - Few-shot 예시로 패턴 학습
+   - "Do NOT add skills not in query" 명시
+
+3. **설정 중앙화**:
+   - `core/constants.py` 삭제 → `config/settings.py`로 이동
+   - `docker-compose.yml`에서 모델명 환경변수화
+
+### 변경 파일
+- `agent/prompts.py`: Few-shot 프롬프트로 변경
+- `config/settings.py`: EMBEDDING_MODEL, OLLAMA_MODEL 등 추가
+- `docker-compose.yml`: `$OLLAMA_MODEL`, `$EMBEDDING_MODEL` 환경변수 사용
+- `.env.example`: 새 모델명 반영
+
+### 교훈
+- 소형 LLM에 화이트리스트 제공 시 복사 할루시네이션 발생 가능
+- Few-shot 예시가 화이트리스트보다 효과적
+- 명시적 금지 지시문("Do NOT...") 필요
