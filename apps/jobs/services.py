@@ -31,10 +31,11 @@ class JobService:
         """
         source_id 생성.
 
-        URL 기반 해시로 고유 ID 생성.
-        MD5 해시 사용 이유: 같은 공고 재크롤링 시 동일 ID 보장 (멱등성).
+        title + company 기반 해시로 고유 ID 생성.
+        URL은 검색 파라미터에 따라 달라지므로 사용하지 않음.
         """
-        return hashlib.md5(job_input.url.encode()).hexdigest()[:16]
+        key = f"{job_input.title}|{job_input.company or ''}"
+        return hashlib.md5(key.encode()).hexdigest()[:16]
 
     async def save_job(
         self,
