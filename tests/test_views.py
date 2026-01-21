@@ -35,7 +35,7 @@ class TestSearchAPI:
 
         assert response.status_code == HTTPStatus.BAD_REQUEST
 
-    @patch("api.views.run_agent")
+    @patch("api.views.search.run_agent")
     async def test_search_success(self, mock_run_agent):
         """검색 성공."""
         mock_run_agent.return_value = AgentResponse(
