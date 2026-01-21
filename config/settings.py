@@ -175,6 +175,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.jobs.tasks.crawl_recent_search_keywords',
         'schedule': crontab(minute=0, hour='*/1'),
     },
+    'cleanup-old-job-postings': {
+        'task': 'apps.jobs.tasks.cleanup_old_job_postings',
+        'schedule': crontab(minute=0, hour=3),
+    },
 }
 
 # Logging

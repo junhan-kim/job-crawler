@@ -14,7 +14,8 @@ from apps.search.models import SearchHistory
 from crawlers import JobKoreaCrawler, SaraminCrawler
 from crawlers.utils import get_random_delay
 
-from .constants import POPULAR_KEYWORDS, RECENT_SEARCH_HOURS, RECENT_SEARCH_LIMIT
+from .constants import JOB_RETENTION_DAYS, POPULAR_KEYWORDS, RECENT_SEARCH_HOURS, RECENT_SEARCH_LIMIT
+from .models import JobPosting
 
 logger = logging.getLogger(__name__)
 
@@ -93,5 +94,13 @@ async def _crawl_recent_keywords_async():
     logger.info(f"Found {len(keywords)} recent search keywords")
 
     for keyword in keywords:
-        if keyword not in POPULAR_KEYWORDS:  # 인기 키워드와 중복 방지
+        if keyword not in POPULAR_KEYWORDS:
             crawl_and_save.delay(keyword)
+
+
+@shared_task
+def cleanup_old_job_postings():
+    """오래된 채용 공고 삭제."""
+    cutoff = timezone.now() - timedelta(days=JOB_RETENTION_DAYS)
+    deleted_count, _ = JobPosting.objects.filter(crawled_at__lt=cutoff).delete()
+    logger.info(f"Deleted {deleted_count} job postings older than {JOB_RETENTION_DAYS} days")
