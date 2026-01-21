@@ -49,6 +49,12 @@ BATCH_CRAWL_MAX_PAGES = int(os.getenv('BATCH_CRAWL_MAX_PAGES', '3'))
 # API
 SEARCH_QUERY_MAX_LENGTH = 500
 
+# Testing
+TESTING = 'pytest' in sys.modules
+
+# Database Features
+DB_SAVE_ENABLED = bool(os.getenv('DB_HOST')) and not TESTING
+
 
 # Application definition
 
@@ -97,8 +103,6 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-TESTING = 'pytest' in sys.modules
 
 if os.getenv('DB_HOST') and not TESTING:
     DATABASES = {

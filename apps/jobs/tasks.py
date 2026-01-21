@@ -104,3 +104,23 @@ def cleanup_old_job_postings():
     cutoff = timezone.now() - timedelta(days=JOB_RETENTION_DAYS)
     deleted_count, _ = JobPosting.objects.filter(crawled_at__lt=cutoff).delete()
     logger.info(f"Deleted {deleted_count} job postings older than {JOB_RETENTION_DAYS} days")
+
+
+@shared_task
+def generate_embeddings_task(job_ids: list[int]):
+    """
+    백그라운드에서 임베딩 생성.
+
+    크롤링 결과 저장 후 비동기로 임베딩 생성하여 응답 속도 향상.
+    """
+    if not job_ids:
+        return
+
+    async_to_sync(_generate_embeddings_async)(job_ids)
+
+
+async def _generate_embeddings_async(job_ids: list[int]):
+    """실제 임베딩 생성 로직."""
+    job_service = JobService()
+    count = await job_service.generate_embeddings_for_jobs(job_ids)
+    logger.info(f"Background embedding generation completed: {count} jobs")

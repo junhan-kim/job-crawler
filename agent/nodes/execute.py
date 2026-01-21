@@ -2,20 +2,20 @@
 
 import asyncio
 import logging
-import os
+
+from django.conf import settings
 
 from agent.models import ExecuteResult, SearchPlan
 from agent.state import AgentState
 from agent.tools.rag import RAGTool
 from apps.jobs.services import JobService
+from apps.jobs.tasks import generate_embeddings_task
 from core.performance import PerformanceTracker
 from crawlers import CrawlerError, CrawlerService
 from crawlers.models import JobPosting as CrawlerJobPosting
 from crawlers.utils import CRAWLER_TIMEOUT, crawler_semaphore
 
 logger = logging.getLogger(__name__)
-
-DB_SAVE_ENABLED = bool(os.getenv("DB_HOST"))
 RAG_MIN_RESULTS = 5
 
 SERVER_BUSY_MESSAGE = "Server is busy. Please try again later."
@@ -32,7 +32,7 @@ async def execute_node(state: AgentState) -> dict:
 
     logger.info(f"Executing search: keyword='{plan.search_keyword}'")
 
-    if DB_SAVE_ENABLED:
+    if settings.DB_SAVE_ENABLED:
         rag_results = await _search_from_rag(plan.search_keyword)
         if len(rag_results) >= RAG_MIN_RESULTS:
             logger.info(f"RAG search sufficient: {len(rag_results)} results")
@@ -56,7 +56,7 @@ async def _execute_crawling(keyword: str) -> dict:
         all_results = await crawler_service.crawl_page(keyword, page=1)
         tracker.checkpoint("parallel_crawl")
 
-        if DB_SAVE_ENABLED and all_results:
+        if settings.DB_SAVE_ENABLED and all_results:
             await _save_to_db(all_results)
             tracker.checkpoint("db_save")
 
@@ -76,14 +76,15 @@ async def _execute_crawling(keyword: str) -> dict:
 
 
 async def _save_to_db(jobs: list[CrawlerJobPosting]) -> None:
-    """크롤링 결과를 DB에 저장 (임베딩 포함)."""
+    """크롤링 결과를 DB에 저장 후 임베딩은 백그라운드 처리."""
     job_service = JobService()
 
-    for job in jobs:
-        try:
-            await job_service.save_job(job)
-        except Exception as error:
-            logger.warning(f"Failed to save job to DB: {error}")
+    try:
+        _, job_ids = await job_service.save_batch(jobs, skip_embedding=True)
+        if job_ids:
+            generate_embeddings_task.delay(job_ids)
+    except Exception as error:
+        logger.warning(f"Failed to save jobs to DB: {error}")
 
 
 async def _search_from_rag(keyword: str) -> list[dict]:

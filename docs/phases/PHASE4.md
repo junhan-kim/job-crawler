@@ -1,239 +1,43 @@
 # Phase 4: 멀티 소스 + 스트리밍
 
 **목표**: 여러 사이트 동시 검색 + 실시간 결과 표시
-**기간**: 2주
-**기술 스택**: +SSE, httpx
+**상태**: 🔶 진행 중
+**기술 스택**: SSE, httpx
 **선행 조건**: Phase 3 완료
 
 ---
 
-## 완성 시 데모
+## 구현 완료 항목
 
-```
-[웹 UI]
-┌─────────────────────────────────────────┐
-│  🔍 백엔드 개발자 Python                 │
-│  [검색]                                  │
-└─────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────┐
-│  🔄 검색 중...                           │
-│                                          │
-│  ✅ 사람인: 5건 완료                     │
-│  🔄 원티드: 검색 중...                   │
-│  ⏳ 잡코리아: 대기 중                    │
-│                                          │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━ 66%          │
-└─────────────────────────────────────────┘
-                    │
-                    ▼ (SSE 실시간 업데이트)
-┌─────────────────────────────────────────┐
-│  📋 총 12건                              │
-│  사람인 5 / 원티드 4 / 잡코리아 3        │
-│                                          │
-│  [전체] [사람인] [원티드] [잡코리아]     │
-│                                          │
-│  ┌────────────────────────────────────┐ │
-│  │ 🏢 원티드 | OO회사                  │ │
-│  │ 백엔드 개발자 (Python/Django)      │ │
-│  │ 💰 5000-7000만 | 📍 서울 강남       │ │
-│  └────────────────────────────────────┘ │
-│  ...                                     │
-└─────────────────────────────────────────┘
-```
+### 1. 잡코리아 크롤러 (P4-2 ✅)
+- `crawlers/jobkorea.py`: JobKoreaCrawler 구현
+- Playwright 기반 크롤링
+- 차단 감지, 지역/경력/마감일 파싱
+
+### 2. 병렬 크롤링 (P4-3 ✅)
+- `crawlers/services.py`: CrawlerService
+- `asyncio.gather`로 사람인+잡코리아 병렬 실행
+- 부분 실패 처리 (`return_exceptions=True`)
 
 ---
 
-## 티켓 목록
+## 남은 티켓
 
 ### P4-1: 원티드 크롤러 구현
 
-**설명**
-원티드 채용 공고를 검색하는 크롤러를 구현한다.
+원티드 채용 공고 검색 크롤러 구현.
 
-**작업 내용**
-- [ ] `crawlers/wanted.py` 작성
-  - 원티드 검색 URL 분석
-    - 검색: `https://www.wanted.co.kr/search?query={keyword}&tab=position`
-  - API 기반 검색 시도 (더 안정적)
-    - 원티드는 내부 API 있음: `https://www.wanted.co.kr/api/v4/jobs`
-    - API 가능하면 Playwright 대신 httpx 사용
-  - 추출 필드:
-    - title, company, location, salary_range, skills, url, posted_at
-- [ ] 셀렉터/API 응답 파싱 로직
-  ```python
-  class WantedCrawler(BaseCrawler):
-      async def search(self, keyword: str) -> list[JobPosting]:
-          # API 방식 시도
-          try:
-              return await self._search_via_api(keyword)
-          except Exception:
-              # fallback: Playwright
-              return await self._search_via_browser(keyword)
+- `crawlers/wanted.py` 작성
+- API 우선 시도, 실패 시 Playwright fallback
+- `JobSource`에 WANTED 추가
 
-      async def _search_via_api(self, keyword: str) -> list[JobPosting]:
-          async with httpx.AsyncClient() as client:
-              response = await client.get(
-                  "https://www.wanted.co.kr/api/v4/jobs",
-                  params={"query": keyword, "limit": 20}
-              )
-              data = response.json()
-              return [self._parse_api_job(job) for job in data['data']]
-  ```
-- [ ] 에러 처리 및 재시도 로직
-- [ ] 단위 테스트
-
-**완료 기준**
-- `WantedCrawler().search("Python")` 호출 시 실제 공고 반환
-- API 실패 시 브라우저 크롤링 fallback
-- 사람인 크롤러와 동일한 출력 포맷
-
-**참고**
-- 원티드 robots.txt 확인 필요
-- API가 막히면 Playwright로 전환
+**완료 기준**: `WantedCrawler().search("Python")` 호출 시 실제 공고 반환
 
 ---
 
-### P4-2: 잡코리아 크롤러 구현
+### P4-4: LLM 기반 검색 재시도 ⭐
 
-**설명**
-잡코리아 채용 공고를 검색하는 크롤러를 구현한다.
-
-**작업 내용**
-- [ ] `crawlers/jobkorea.py` 작성
-  - 검색 URL: `https://www.jobkorea.co.kr/Search/?stext={keyword}`
-  - 잡코리아는 API 없음 → Playwright 필수
-- [ ] 셀렉터 정의
-  ```python
-  SELECTORS = {
-      "job_list": "div.list-default",
-      "job_item": "div.list-item",
-      "title": "a.information-title",
-      "company": "a.corp-name",
-      "conditions": "p.chip-information-group span",
-      # ...
-  }
-  ```
-- [ ] 페이지네이션 처리 (선택적, 첫 페이지만도 가능)
-- [ ] 에러 처리
-- [ ] 단위 테스트
-
-**완료 기준**
-- `JobKoreaCrawler().search("백엔드")` 호출 시 실제 공고 반환
-- 필수 필드 추출 (title, company, url)
-- 크롤링 차단 감지
-
----
-
-### P4-3: 크롤러 팩토리 및 통합
-
-**설명**
-여러 크롤러를 통합 관리하는 팩토리를 구현한다.
-
-**작업 내용**
-- [ ] `crawlers/__init__.py` 수정
-  ```python
-  class CrawlerFactory:
-      CRAWLERS = {
-          'saramin': SaraminCrawler,
-          'wanted': WantedCrawler,
-          'jobkorea': JobKoreaCrawler,
-      }
-
-      @classmethod
-      def get_crawler(cls, source: str) -> BaseCrawler:
-          crawler_class = cls.CRAWLERS.get(source)
-          if not crawler_class:
-              raise ValueError(f"Unknown source: {source}")
-          return crawler_class()
-
-      @classmethod
-      def get_all_crawlers(cls) -> list[tuple[str, BaseCrawler]]:
-          return [(name, cls()) for name, cls in cls.CRAWLERS.items()]
-  ```
-- [ ] 설정에서 활성화할 크롤러 지정
-  ```python
-  # settings/base.py
-  ACTIVE_CRAWLERS = ['saramin', 'wanted', 'jobkorea']
-  ```
-- [ ] 크롤러 상태 관리
-  ```python
-  class CrawlerStatus:
-      def __init__(self, source: str):
-          self.source = source
-          self.status = 'pending'  # pending, running, completed, failed
-          self.result_count = 0
-          self.error = None
-  ```
-
-**완료 기준**
-- 팩토리로 모든 크롤러 접근 가능
-- 활성화된 크롤러만 사용
-- 각 크롤러 상태 추적 가능
-
----
-
-### P4-4: 병렬 크롤링 구현
-
-**설명**
-여러 크롤러를 병렬로 실행하여 검색 시간을 단축한다.
-
-**작업 내용**
-- [ ] `agent/tools/crawler.py` 수정
-  ```python
-  import asyncio
-
-  class CrawlerTool:
-      def __init__(self):
-          self.factory = CrawlerFactory()
-
-      async def search_all(
-          self,
-          keyword: str,
-          sources: list[str] = None
-      ) -> dict[str, list[JobPosting]]:
-          """모든 크롤러에서 병렬 검색"""
-          sources = sources or settings.ACTIVE_CRAWLERS
-
-          async def crawl_source(source: str):
-              crawler = self.factory.get_crawler(source)
-              try:
-                  results = await asyncio.wait_for(
-                      crawler.search(keyword),
-                      timeout=30  # 사이트당 30초 타임아웃
-                  )
-                  return source, results, None
-              except Exception as e:
-                  return source, [], str(e)
-
-          # 병렬 실행
-          tasks = [crawl_source(s) for s in sources]
-          results = await asyncio.gather(*tasks)
-
-          return {
-              source: {
-                  'results': jobs,
-                  'error': error
-              }
-              for source, jobs, error in results
-          }
-  ```
-- [ ] 전체 타임아웃 설정 (60초)
-- [ ] 부분 결과 반환 (일부 실패해도 성공한 것 반환)
-
-**완료 기준**
-- 3개 사이트 병렬 크롤링
-- 총 소요 시간: max(개별 시간) + α (30-40초 예상)
-- 일부 실패 시에도 부분 결과 반환
-
----
-
-### P4-5: LLM 기반 검색 재시도 (LangGraph 조건부 분기)
-
-**설명**
-검색 결과가 부족할 때 LLM이 키워드를 확장하여 자동 재검색한다.
-LangGraph의 조건부 엣지를 활용하여 LLM이 흐름을 결정하는 첫 번째 기능.
+검색 결과 부족 시 LLM이 키워드를 확장하여 자동 재검색. LangGraph 조건부 엣지 활용.
 
 **워크플로우**
 ```
@@ -243,406 +47,74 @@ parse → plan → execute → evaluate ─┬─ 결과 충분 → synthesize �
                        (LLM 키워드 확장)
 ```
 
-**작업 내용**
-- [ ] `agent/nodes/evaluate.py` 작성
-  ```python
-  MIN_RESULTS_THRESHOLD = 3
-  MAX_RETRY_COUNT = 2
+- `agent/nodes/evaluate.py`: 결과 평가 + 재검색 결정
+- LLM 키워드 확장 (동의어, 유사 직무명)
+- 조건부 엣지: `evaluate` → `plan` (재시도) 또는 `synthesize` (완료)
+- 최대 2회 재시도
 
-  async def evaluate_node(state: AgentState) -> dict:
-      """
-      검색 결과를 평가하고 재검색 필요 여부 결정.
+**완료 기준**: 결과 3건 미만 시 LLM이 키워드 확장 후 재검색
 
-      Input: crawl_results, retry_count
-      Output: should_retry, retry_count, expanded_keywords
-      """
-      results = state["crawl_results"] or []
-      retry_count = state.get("retry_count", 0)
-
-      if len(results) >= MIN_RESULTS_THRESHOLD:
-          return {"should_retry": False}
-
-      if retry_count >= MAX_RETRY_COUNT:
-          logger.info("Max retry reached, proceeding with current results")
-          return {"should_retry": False}
-
-      # LLM에게 키워드 확장 요청
-      expanded = await _expand_keywords_with_llm(state)
-
-      return {
-          "should_retry": True,
-          "retry_count": retry_count + 1,
-          "expanded_keywords": expanded,
-      }
-  ```
-- [ ] LLM 키워드 확장 함수
-  ```python
-  async def _expand_keywords_with_llm(state: AgentState) -> list[str]:
-      """LLM이 검색 키워드를 확장."""
-      original_keywords = state["search_plan"]["keywords"]
-      conditions = state["parsed_conditions"]
-
-      prompt = f"""
-      검색 결과가 부족합니다.
-      원래 키워드: {original_keywords}
-      검색 조건: {conditions}
-
-      더 많은 결과를 찾기 위해 키워드를 확장해주세요.
-      - 동의어, 유사 직무명 추가
-      - 기술 스택의 다른 표현 추가
-
-      JSON 형식으로 응답:
-      {{"expanded_keywords": ["키워드1", "키워드2", ...]}}
-      """
-
-      llm = OllamaProvider()
-      response = await llm.chat(prompt)
-      data = json.loads(response.content)
-      return data["expanded_keywords"]
-  ```
-- [ ] `agent/graph.py` 수정 (조건부 엣지 추가)
-  ```python
-  from langgraph.graph import StateGraph, END
-
-  def should_retry(state: AgentState) -> str:
-      """재검색 여부 결정."""
-      if state.get("should_retry"):
-          return "plan"  # plan 노드로 돌아가서 재검색
-      return "synthesize"
-
-  def create_graph():
-      workflow = StateGraph(AgentState)
-
-      workflow.add_node("parse", parse_node)
-      workflow.add_node("plan", plan_node)
-      workflow.add_node("execute", execute_node)
-      workflow.add_node("evaluate", evaluate_node)  # 새 노드
-      workflow.add_node("synthesize", synthesize_node)
-
-      workflow.add_edge("parse", "plan")
-      workflow.add_edge("plan", "execute")
-      workflow.add_edge("execute", "evaluate")
-
-      # 조건부 분기: LangGraph의 핵심 기능
-      workflow.add_conditional_edges(
-          "evaluate",
-          should_retry,
-          {"plan": "plan", "synthesize": "synthesize"}
-      )
-
-      workflow.add_edge("synthesize", END)
-      workflow.set_entry_point("parse")
-
-      return workflow.compile()
-  ```
-- [ ] `AgentState`에 필드 추가
-  ```python
-  class AgentState(TypedDict):
-      # 기존 필드...
-      retry_count: int | None
-      should_retry: bool | None
-      expanded_keywords: list[str] | None
-  ```
-- [ ] `plan_node` 수정 (확장 키워드 사용)
-  ```python
-  async def plan_node(state: AgentState) -> dict:
-      # 재시도 시 확장 키워드 사용
-      if state.get("expanded_keywords"):
-          keywords = state["expanded_keywords"]
-      else:
-          keywords = _build_keywords(conditions)
-      # ...
-  ```
-
-**완료 기준**
-- 결과 3건 미만 시 LLM이 키워드 확장
-- 최대 2회 재시도 후 기존 결과로 진행
-- SSE로 "재검색 중..." 상태 전달
-- 로그에서 재시도 흐름 확인 가능
-
-**예시 시나리오**
-```
-[입력] "Rust 시스템 프로그래머"
-[1차 검색] 키워드: "Rust 시스템 프로그래머" → 1건
-[LLM 판단] 결과 부족, 키워드 확장 필요
-[LLM 확장] ["Rust", "시스템 개발자", "임베디드", "C++"]
-[2차 검색] 키워드: "Rust 시스템 개발자 임베디드" → 8건
-[완료] 8건 반환
-```
-
-**의의**
-- LangGraph의 조건부 분기를 실제로 활용
-- LLM이 워크플로우 흐름을 결정하는 첫 사례
-- 단순 파이프라인에서 "에이전트"로 진화
+**의의**: LangGraph 조건부 분기 실습, 단순 파이프라인 → 에이전트 진화
 
 ---
 
-### P4-6: SSE 스트리밍 API 구현
+### P4-5: SSE 스트리밍 API 구현
 
-**설명**
-Server-Sent Events를 사용하여 검색 진행 상황을 실시간으로 전달한다.
-재검색 시에도 "키워드 확장 중...", "재검색 중..." 이벤트 전달.
+Server-Sent Events로 검색 진행 상황 실시간 전달.
 
-**작업 내용**
-- [ ] `apps/search/views.py`에 SSE 뷰 추가
-  ```python
-  from django.http import StreamingHttpResponse
-  import json
+- `GET /api/search/stream/` 엔드포인트
+- 이벤트: parsing, crawling, crawled, synthesizing, done
+- Django ASGI + StreamingHttpResponse
 
-  async def search_stream(request):
-      query = request.GET.get('query', '')
-
-      async def event_generator():
-          # 파싱 단계
-          yield f"data: {json.dumps({'stage': 'parsing', 'message': '검색 조건 분석 중...'})}\n\n"
-
-          parsed = await parse_query(query)
-          yield f"data: {json.dumps({'stage': 'parsed', 'conditions': parsed})}\n\n"
-
-          # 크롤링 단계
-          for source in ['saramin', 'wanted', 'jobkorea']:
-              yield f"data: {json.dumps({'stage': 'crawling', 'source': source, 'status': 'started'})}\n\n"
-
-          # 병렬 크롤링 (각 완료 시마다 이벤트)
-          async for event in crawl_with_events(parsed):
-              yield f"data: {json.dumps(event)}\n\n"
-
-          # 완료
-          yield f"data: {json.dumps({'stage': 'done'})}\n\n"
-
-      return StreamingHttpResponse(
-          event_generator(),
-          content_type='text/event-stream',
-          headers={
-              'Cache-Control': 'no-cache',
-              'X-Accel-Buffering': 'no',  # nginx 버퍼링 비활성화
-          }
-      )
-  ```
-- [ ] 이벤트 타입 정의
-  ```python
-  # 이벤트 스키마
-  {
-      'stage': 'parsing' | 'parsed' | 'crawling' | 'crawled' | 'synthesizing' | 'done',
-      'source': str,  # 크롤링 중인 소스
-      'status': 'started' | 'completed' | 'failed',
-      'results': list,  # 해당 소스 결과
-      'error': str,  # 에러 메시지
-      'progress': float,  # 0-100
-  }
-  ```
-- [ ] URL 라우팅 추가 (`GET /api/search/stream/`)
-
-**완료 기준**
-- SSE 연결 유지
-- 각 단계 이벤트 수신 가능
-- 브라우저에서 EventSource로 연결 가능
-
-**참고**
-- Django SSE: ASGI 필수
-- nginx 사용 시 `X-Accel-Buffering: no` 필요
+**완료 기준**: 브라우저에서 EventSource로 각 단계 이벤트 수신 가능
 
 ---
 
 ### P4-6: SSE 클라이언트 구현
 
-**설명**
-프론트엔드에서 SSE를 수신하고 UI를 업데이트한다.
+프론트엔드에서 SSE 수신 및 UI 업데이트.
 
-**작업 내용**
-- [ ] `static/js/search.js` 수정
-  ```javascript
-  function searchWithStream(query) {
-      const eventSource = new EventSource(
-          `/api/search/stream/?query=${encodeURIComponent(query)}`
-      );
+- `static/js/search.js`에 EventSource 연결
+- 각 크롤러 상태 실시간 표시
+- 프로그레스 바 업데이트
 
-      eventSource.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-
-          switch (data.stage) {
-              case 'parsing':
-                  updateStatus('검색 조건 분석 중...');
-                  break;
-              case 'crawling':
-                  updateCrawlerStatus(data.source, data.status);
-                  break;
-              case 'crawled':
-                  addResults(data.source, data.results);
-                  updateProgress(data.progress);
-                  break;
-              case 'done':
-                  eventSource.close();
-                  showFinalResults();
-                  break;
-          }
-      };
-
-      eventSource.onerror = (error) => {
-          console.error('SSE Error:', error);
-          eventSource.close();
-          showError('연결이 끊어졌습니다.');
-      };
-  }
-  ```
-- [ ] 진행 상황 UI 컴포넌트
-  ```javascript
-  function updateCrawlerStatus(source, status) {
-      const icons = {
-          pending: '⏳',
-          started: '🔄',
-          completed: '✅',
-          failed: '❌'
-      };
-      document.getElementById(`status-${source}`).textContent =
-          `${icons[status]} ${source}`;
-  }
-  ```
-- [ ] 프로그레스 바 업데이트
-
-**완료 기준**
-- 실시간으로 각 크롤러 상태 표시
-- 결과가 오는 대로 UI 업데이트
-- 프로그레스 바 동작
+**완료 기준**: 결과가 오는 대로 UI 업데이트
 
 ---
 
 ### P4-7: 소스별 필터 UI
 
-**설명**
-검색 결과를 소스별로 필터링하는 UI를 구현한다.
+검색 결과를 소스별로 필터링하는 UI.
 
-**작업 내용**
-- [ ] 탭 UI 구현
-  ```html
-  <div class="flex gap-2 mb-4">
-      <button class="tab active" data-source="all"
-              onclick="filterBySource('all')">
-          전체 (12)
-      </button>
-      <button class="tab" data-source="saramin"
-              onclick="filterBySource('saramin')">
-          사람인 (5)
-      </button>
-      <button class="tab" data-source="wanted"
-              onclick="filterBySource('wanted')">
-          원티드 (4)
-      </button>
-      <button class="tab" data-source="jobkorea"
-              onclick="filterBySource('jobkorea')">
-          잡코리아 (3)
-      </button>
-  </div>
-  ```
-- [ ] JavaScript 필터링
-  ```javascript
-  let allResults = [];  // 전체 결과 저장
-
-  function filterBySource(source) {
-      // 탭 활성화 상태 변경
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelector(`[data-source="${source}"]`).classList.add('active');
-
-      // 필터링
-      const filtered = source === 'all'
-          ? allResults
-          : allResults.filter(r => r.source === source);
-
-      renderResults(filtered);
-  }
-  ```
-- [ ] 결과 카드에 소스 뱃지 추가
-  ```html
-  <span class="px-2 py-1 text-xs rounded"
-        style="background-color: {{ source_color }}">
-      {{ source_name }}
-  </span>
-  ```
-- [ ] 소스별 색상
-  - 사람인: 파란색
-  - 원티드: 보라색
-  - 잡코리아: 초록색
-
-**완료 기준**
-- 탭 클릭 시 해당 소스 결과만 표시
+- 탭 UI: [전체] [사람인] [원티드] [잡코리아]
 - 각 탭에 결과 개수 표시
-- 결과 카드에 소스 표시
+- 결과 카드에 소스 뱃지 추가
+
+**완료 기준**: 탭 클릭 시 해당 소스 결과만 표시
 
 ---
 
 ### P4-8: 진행 상황 UI 개선
 
-**설명**
-검색 진행 상황을 더 상세하게 표시한다.
+검색 진행 상황 상세 표시.
 
-**작업 내용**
-- [ ] 단계별 상태 표시
-  ```html
-  <div class="space-y-2">
-      <div class="flex items-center gap-2">
-          <span id="step-parse" class="status-icon">⏳</span>
-          <span>검색 조건 분석</span>
-      </div>
-      <div class="flex items-center gap-2">
-          <span id="step-crawl" class="status-icon">⏳</span>
-          <span>채용 공고 검색</span>
-          <div class="ml-4 text-sm text-gray-500">
-              <span id="status-saramin">⏳ 사람인</span>
-              <span id="status-wanted">⏳ 원티드</span>
-              <span id="status-jobkorea">⏳ 잡코리아</span>
-          </div>
-      </div>
-      <div class="flex items-center gap-2">
-          <span id="step-analyze" class="status-icon">⏳</span>
-          <span>결과 분석</span>
-      </div>
-  </div>
-  ```
-- [ ] 프로그레스 바
-  ```html
-  <div class="w-full bg-gray-200 rounded-full h-2">
-      <div id="progress-bar"
-           class="bg-blue-500 h-2 rounded-full transition-all duration-300"
-           style="width: 0%">
-      </div>
-  </div>
-  <p id="progress-text" class="text-sm text-gray-500 mt-1">0%</p>
-  ```
-- [ ] 예상 소요 시간 표시
-- [ ] 취소 버튼 (선택적)
+- 단계별 상태 아이콘 (파싱 → 크롤링 → 분석)
+- 프로그레스 바
+- 각 크롤러별 상태 표시
 
-**완료 기준**
-- 각 단계 상태 시각적 표시
-- 프로그레스 바 진행률 표시
-- 사용자가 현재 진행 상황 파악 가능
+**완료 기준**: 사용자가 현재 진행 상황 파악 가능
 
 ---
 
 ### P4-9: 통합 테스트 및 안정화
 
-**설명**
-멀티 소스 검색 전체 플로우를 테스트하고 안정화한다.
+멀티 소스 검색 전체 플로우 테스트.
 
-**작업 내용**
-- [ ] E2E 테스트
-  - 3개 사이트 동시 검색
-  - 1개 사이트 실패 시 나머지 결과 반환
-  - SSE 이벤트 순서 검증
-- [ ] 성능 테스트
-  - 병렬 크롤링 소요 시간 측정
-  - SSE 지연 시간 측정
-- [ ] 에러 케이스 테스트
-  - 모든 크롤러 실패
-  - SSE 연결 끊김
-  - 타임아웃
-- [ ] 버그 수정 및 안정화
-- [ ] 문서 업데이트
+- E2E 테스트: 동시 검색, 부분 실패 처리
+- 성능 테스트: 병렬 크롤링 시간, SSE 지연
+- 에러 케이스: 전체 실패, 연결 끊김, 타임아웃
 
-**완료 기준**
-- 모든 테스트 통과
-- 병렬 크롤링 전체 시간 40초 이내
-- SSE 이벤트 누락 없음
-- 1개 이상 성공 시 부분 결과 표시
+**완료 기준**: 모든 테스트 통과, 병렬 크롤링 40초 이내
 
 ---
 
@@ -650,18 +122,14 @@ Server-Sent Events를 사용하여 검색 진행 상황을 실시간으로 전�
 
 ```
 [ ] P4-1: 원티드 크롤러 구현
-[ ] P4-2: 잡코리아 크롤러 구현
-[ ] P4-3: 크롤러 팩토리 및 통합
-[ ] P4-4: 병렬 크롤링 구현
-[ ] P4-5: LLM 기반 검색 재시도 (LangGraph 조건부 분기) ⭐
-[ ] P4-6: SSE 스트리밍 API 구현
-[ ] P4-7: SSE 클라이언트 구현
-[ ] P4-8: 소스별 필터 UI
-[ ] P4-9: 진행 상황 UI 개선
-[ ] P4-10: API 페이지네이션 구현
-[ ] P4-11: 통합 테스트 및 안정화
-────────────────────────────────────────
-✅ 데모: 3개 사이트 동시 검색 + 실시간 표시 + 스마트 재검색
+[x] P4-2: 잡코리아 크롤러 구현
+[x] P4-3: 병렬 크롤링 (CrawlerService)
+[ ] P4-4: LLM 기반 검색 재시도 ⭐
+[ ] P4-5: SSE 스트리밍 API 구현
+[ ] P4-6: SSE 클라이언트 구현
+[ ] P4-7: 소스별 필터 UI
+[ ] P4-8: 진행 상황 UI 개선
+[ ] P4-9: 통합 테스트 및 안정화
 ```
 
 ---
@@ -670,11 +138,9 @@ Server-Sent Events를 사용하여 검색 진행 상황을 실시간으로 전�
 
 | 문제 | 해결 방법 |
 |------|----------|
-| 원티드 API 변경/차단 | Playwright fallback, API 버전 확인 |
-| SSE 연결 끊김 | 자동 재연결 로직, 상태 복구 |
-| 병렬 크롤링 메모리 | 브라우저 인스턴스 공유, 순차 실행 fallback |
-| 일부 크롤러만 느림 | 개별 타임아웃, 빠른 것 먼저 표시 |
-| nginx 버퍼링 | X-Accel-Buffering: no 헤더 |
-| LLM 키워드 확장 실패 | fallback: 원래 키워드로 진행, JSON 파싱 에러 처리 |
-| 무한 재시도 루프 | MAX_RETRY_COUNT 제한, 이전 키워드와 동일하면 중단 |
-| 재검색 시간 초과 | 전체 타임아웃 + 재시도 횟수 기반 시간 제한 |
+| 원티드 API 변경/차단 | Playwright fallback |
+| SSE 연결 끊김 | 자동 재연결 로직 |
+| 병렬 크롤링 메모리 | 브라우저 인스턴스 공유 |
+| nginx 버퍼링 | `X-Accel-Buffering: no` 헤더 |
+| LLM 키워드 확장 실패 | 원래 키워드로 진행 |
+| 무한 재시도 루프 | MAX_RETRY_COUNT 제한 |

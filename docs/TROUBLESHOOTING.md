@@ -115,3 +115,70 @@ url = f"{self.SEARCH_URL}?searchword={quote(keyword)}&recruitPage={page}"
 - 소형 LLM에 화이트리스트 제공 시 복사 할루시네이션 발생 가능
 - Few-shot 예시가 화이트리스트보다 효과적
 - 명시적 금지 지시문("Do NOT...") 필요
+
+---
+
+## 2026-01-22: 스크롤 후 검색 결과 누적 안 됨
+
+### 문제
+"파이썬 개발자" 검색 후 스크롤로 추가 로드해도, 다음 검색 시 RAG 결과가 여전히 7건.
+DB에 데이터가 누적되지 않음.
+
+### 원인 파악
+`load_more.py`에서 크롤링 결과를 DB에 저장하지 않고 있었음.
+
+```python
+# Before: 크롤링만 하고 바로 반환
+job_postings = await crawler_service.crawl_page(keyword, page)
+results = [job.model_dump() for job in job_postings]
+return Response(...)
+```
+
+스크롤 시 새 공고를 가져오지만 DB 저장이 없어서 RAG에 반영 안 됨.
+
+### 해결
+`load_more.py`에 DB 저장 로직 추가.
+
+```python
+if settings.DB_SAVE_ENABLED and job_postings:
+    job_service = JobService()
+    await job_service.save_batch(job_postings)
+```
+
+### 변경 파일
+- `api/views/load_more.py`: DB 저장 로직 추가
+- `config/settings.py`: `DB_SAVE_ENABLED` 설정 추가
+- `agent/nodes/execute.py`: `os.getenv` → `settings.DB_SAVE_ENABLED`로 변경
+
+### 교훈
+- 데이터 흐름 전체를 파악해야 함 (검색 → 크롤링 → 저장 → RAG)
+- 설정값은 Django settings에서 중앙 관리
+
+---
+
+## 2026-01-22: 크롤링 후 응답 지연 (10~20초)
+
+### 문제
+새 키워드 검색 시 응답이 10~20초 걸림. RAG 결과가 충분해도 느릴 때가 있음.
+
+### 원인 파악
+DB 저장 시 각 job마다 임베딩을 개별 생성.
+
+```
+[01:50:05,069] POST http://ollama:11434/api/embed "HTTP/1.1 200 OK"
+[01:50:05,123] POST http://ollama:11434/api/embed "HTTP/1.1 200 OK"
+... (53개 반복)
+[01:50:07,470] Batch save completed: 40 created, 13 updated
+```
+
+53개 job × ~60ms = 약 3초 추가 지연. 크롤링(5초) + 임베딩(3초) + 기타 = 10초+
+
+### 해결 방안
+1. **배치 임베딩**: 여러 텍스트를 한 번에 임베딩 요청
+2. **백그라운드 처리**: 응답 먼저 반환하고 임베딩은 Celery로 비동기 처리
+
+→ 백그라운드 처리 권장: 임베딩은 다음 검색용이므로 즉시 완료 불필요
+
+### 교훈
+- 임베딩은 검색 쿼리용 1회 vs DB 저장용 N회 구분 필요
+- 사용자 응답 속도와 데이터 처리는 분리 가능

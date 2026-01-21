@@ -39,6 +39,10 @@
 - 데이터는 dict 대신 Pydantic 모델 사용 (코드만 보고 필드 추적 가능)
 - LangGraph state처럼 dict 강제되는 경우, 노드 진입 시 즉시 모델로 변환
 
+## import
+- 파일 최상단에 import (함수 내부 import 금지)
+- circular import는 설계로 해결 (lazy import 금지)
+
 ## 파일 구조
 - 모델/타입 정의는 별도 파일로 분리 (예: models.py)
 - 한 파일에 여러 책임 넣지 않기

@@ -1,9 +1,13 @@
 """무한 스크롤 추가 로드 API 뷰."""
 import asyncio
+import logging
 
 from adrf.views import APIView
+from django.conf import settings
 from rest_framework.response import Response
 
+from apps.jobs.services import JobService
+from apps.jobs.tasks import generate_embeddings_task
 from crawlers import CrawlerService
 from crawlers.utils import CRAWLER_TIMEOUT, crawler_semaphore
 
@@ -13,6 +17,8 @@ from ..serializers import (
     LoadMoreResponseSerializer,
     RequestField,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class LoadMoreView(APIView):
@@ -47,6 +53,12 @@ class LoadMoreView(APIView):
                     job_postings = await crawler_service.crawl_page(keyword, page)
         except TimeoutError as error:
             raise ServerBusyError() from error
+
+        if settings.DB_SAVE_ENABLED and job_postings:
+            job_service = JobService()
+            _, job_ids = await job_service.save_batch(job_postings, skip_embedding=True)
+            if job_ids:
+                generate_embeddings_task.delay(job_ids)
 
         results = [job.model_dump() for job in job_postings]
         has_more = len(results) >= self.MIN_RESULTS_FOR_MORE
