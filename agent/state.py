@@ -7,6 +7,7 @@ class AgentState(TypedDict):
     """에이전트 상태."""
 
     query: str
+    page: int
     parsed_conditions: dict | None
     search_plan: dict | None
     crawl_results: list[dict] | None

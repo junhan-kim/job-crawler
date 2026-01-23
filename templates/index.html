@@ -93,7 +93,6 @@
         const historyDiv = document.getElementById('history');
 
         let currentData = null;
-        let currentKeyword = null;
         let currentPage = 1;
         let isLoadingMore = false;
         let hasMorePages = true;
@@ -167,7 +166,7 @@
         }
 
         async function loadMoreItems() {
-            if (!currentKeyword || isLoadingMore || !hasMorePages) return;
+            if (!currentData || isLoadingMore || !hasMorePages) return;
 
             isLoadingMore = true;
             const loadMoreArea = document.getElementById('load-more-area');
@@ -175,10 +174,15 @@
 
             try {
                 const nextPage = currentPage + 1;
-                const res = await fetch('/api/search/more/', {
+                const res = await fetch('/api/search/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ keyword: currentKeyword, page: nextPage })
+                    body: JSON.stringify({
+                        query: currentData.query,
+                        page: nextPage,
+                        parsed_conditions: currentData.parsed_conditions,
+                        search_plan: currentData.search_plan
+                    })
                 });
                 const data = await res.json();
 
@@ -195,9 +199,9 @@
                     jobList.insertAdjacentHTML('beforeend', data.results.map(renderJobCard).join(''));
 
                     const resultCount = document.getElementById('result-count');
-                    if (resultCount && currentData) {
-                        currentData.total_count += data.total_count;
-                        resultCount.textContent = `${currentData.total_count}건`;
+                    if (resultCount) {
+                        const totalCount = parseInt(resultCount.textContent) + data.total_count;
+                        resultCount.textContent = `${totalCount}건`;
                     }
                 }
 
@@ -229,7 +233,6 @@
             searchBtn.disabled = true;
             resultDiv.innerHTML = renderLoading();
             currentData = null;
-            currentKeyword = null;
             currentPage = 1;
             hasMorePages = true;
 
@@ -245,7 +248,7 @@
                     resultDiv.innerHTML = renderError(data.error);
                 } else {
                     currentData = data;
-                    currentKeyword = extractKeyword(data);
+                    hasMorePages = data.has_more;
                     resultDiv.innerHTML = renderResults(data);
                     loadHistory();
                 }
@@ -254,18 +257,6 @@
             } finally {
                 searchBtn.disabled = false;
             }
-        }
-
-        function extractKeyword(data) {
-            if (data.parsed_conditions) {
-                const parts = [];
-                if (data.parsed_conditions.role) parts.push(data.parsed_conditions.role);
-                if (data.parsed_conditions.skills && data.parsed_conditions.skills.length > 0) {
-                    parts.push(...data.parsed_conditions.skills);
-                }
-                if (parts.length > 0) return parts.join(' ');
-            }
-            return data.query || '';
         }
 
         searchBtn.addEventListener('click', search);

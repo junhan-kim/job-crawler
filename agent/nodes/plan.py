@@ -2,8 +2,9 @@
 
 import logging
 
-from agent.models import ParsedQuery, SearchFilters, SearchPlan
+from agent.models import ParsedQuery, SearchPlan
 from agent.state import AgentState
+from crawlers import SearchFilters
 
 logger = logging.getLogger(__name__)
 

@@ -2,13 +2,13 @@ from .base import BaseCrawler
 from .browser import BrowserPool, get_browser_pool
 from .exceptions import CrawlerBlockedError, CrawlerError, CrawlerTimeoutError
 from .jobkorea import JobKoreaCrawler
-from .models import JobPosting, JobSource
+from .models import JobPosting, JobSource, SearchFilters
 from .saramin import SaraminCrawler
-from .services import CrawlerService
 
 __all__ = [
     "JobPosting",
     "JobSource",
+    "SearchFilters",
     "BaseCrawler",
     "BrowserPool",
     "get_browser_pool",
@@ -17,5 +17,4 @@ __all__ = [
     "CrawlerError",
     "CrawlerBlockedError",
     "CrawlerTimeoutError",
-    "CrawlerService",
 ]

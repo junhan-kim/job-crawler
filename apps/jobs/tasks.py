@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from apps.jobs.services import JobService
 from apps.search.models import SearchHistory
-from crawlers import JobKoreaCrawler, SaraminCrawler
+from crawlers.services import CrawlerService
 from crawlers.utils import get_random_delay
 
 from .constants import JOB_RETENTION_DAYS, POPULAR_KEYWORDS, RECENT_SEARCH_HOURS, RECENT_SEARCH_LIMIT
@@ -48,27 +48,27 @@ def crawl_and_save(self, keyword: str):
 
 async def _crawl_and_save_async(keyword: str):
     """실제 비동기 크롤링 로직."""
-    job_service = JobService()
     max_pages = settings.BATCH_CRAWL_MAX_PAGES
+    crawler_service = CrawlerService()
 
-    crawlers = [SaraminCrawler(), JobKoreaCrawler()]
-
-    for crawler in crawlers:
-        total_jobs = 0
+    total_jobs = 0
+    for page_num in range(1, max_pages + 1):
         try:
-            for page_num in range(1, max_pages + 1):
-                results = await crawler.search(keyword, page=page_num)
-                for job in results:
-                    await job_service.save_job(job)
-                total_jobs += len(results)
+            results, job_ids = await crawler_service.crawl_page(
+                keyword, page=page_num, filters=None, save_to_db=True
+            )
+            total_jobs += len(results)
 
-                if page_num < max_pages:
-                    delay = get_random_delay()
-                    await asyncio.sleep(delay)
+            if job_ids:
+                generate_embeddings_task.delay(job_ids)
 
-            logger.info(f"{crawler.__class__.__name__}: {total_jobs} jobs for '{keyword}'")
+            if page_num < max_pages:
+                delay = get_random_delay()
+                await asyncio.sleep(delay)
         except Exception as error:
-            logger.error(f"{crawler.__class__.__name__} crawl failed for {keyword}: {error}")
+            logger.error(f"Crawl failed for {keyword} page {page_num}: {error}")
+
+    logger.info(f"Batch crawl completed: {total_jobs} jobs for '{keyword}'")
 
 
 @shared_task

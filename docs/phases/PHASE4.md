@@ -52,6 +52,11 @@ parse → plan → execute → evaluate ─┬─ 결과 충분 → synthesize �
 - 조건부 엣지: `evaluate` → `plan` (재시도) 또는 `synthesize` (완료)
 - 최대 2회 재시도
 
+**고려사항**
+- 최대 재시도 2회 (무한루프 방지)
+- 키워드 확장 실패 시 원래 결과로 진행
+- 중복 결과: 1차+2차 결과 합산, title+company 기준 중복 제거
+
 **완료 기준**: 결과 3건 미만 시 LLM이 키워드 확장 후 재검색
 
 **의의**: LangGraph 조건부 분기 실습, 단순 파이프라인 → 에이전트 진화

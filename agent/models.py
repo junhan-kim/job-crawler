@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
 
+from crawlers import SearchFilters
+
 
 class ParsedQuery(BaseModel):
     """사용자의 채용 검색 요청에서 추출된 정보."""
@@ -16,13 +18,6 @@ class ParsedQuery(BaseModel):
         if value is None:
             return []
         return value
-
-
-class SearchFilters(BaseModel):
-    """검색 필터 조건."""
-
-    experience: int | None = None
-    location: str | None = None
 
 
 class SearchPlan(BaseModel):
@@ -60,10 +55,13 @@ class AgentResponse(BaseModel):
     """에이전트 응답 스키마."""
 
     query: str
+    page: int = 1
     parsed_conditions: ParsedQuery | None = None
+    search_plan: SearchPlan | None = None
     response: str
     results: list[dict] = Field(default_factory=list)
     total_count: int = 0
+    has_more: bool = False
     search_time_ms: int = 0
 
 
