@@ -63,6 +63,7 @@ class SearchResponseSerializer(serializers.Serializer):
     search_plan = SearchPlanSerializer(allow_null=True)
     response = serializers.CharField()
     results = JobPostingSerializer(many=True)
+    recommendations = JobPostingSerializer(many=True, default=list)
     total_count = serializers.IntegerField()
     has_more = serializers.BooleanField()
     search_time_ms = serializers.IntegerField()

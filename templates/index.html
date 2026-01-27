@@ -14,7 +14,8 @@
 
         .layout { max-width: 900px; margin: 0 auto; }
         .main-content { }
-        .sidebar { position: fixed; top: 150px; right: 20px; width: 280px; }
+        .sidebar-left { position: fixed; top: 150px; left: 20px; width: 280px; max-height: calc(100vh - 170px); overflow-y: auto; }
+        .sidebar-right { position: fixed; top: 150px; right: 20px; width: 280px; }
 
         h1 { text-align: center; margin-bottom: 30px; color: #333; }
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -56,6 +57,15 @@
         .load-more { text-align: center; padding: 20px; }
         .load-more-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #ddd; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
 
+        .recommendations-section h3 { font-size: 16px; color: #4b5563; margin-bottom: 12px; }
+        .recommendations-list { display: flex; flex-direction: column; gap: 8px; }
+        .recommendations-list .job-card { padding: 12px; }
+        .recommendations-list .job-title { font-size: 14px; }
+        .recommendations-list .job-company { font-size: 13px; }
+        .recommendations-list .job-meta { font-size: 12px; }
+        .recommendations-list .job-skills { display: none; }
+        .recommendations-empty { text-align: center; padding: 20px; color: #9ca3af; font-size: 14px; background: white; border-radius: 8px; }
+
         .history-section { }
         .history-section h3 { font-size: 16px; color: #4b5563; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
         .history-list { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 200px); overflow-y: auto; }
@@ -66,7 +76,7 @@
         .history-empty { text-align: center; padding: 20px; color: #9ca3af; font-size: 14px; background: white; border-radius: 8px; }
 
         @media (max-width: 1200px) {
-            .sidebar { display: none; }
+            .sidebar-left, .sidebar-right { display: none; }
         }
     </style>
 </head>
@@ -79,10 +89,13 @@
         </div>
     </div>
     <div class="layout">
+        <div class="sidebar-left">
+            <div id="recommendations" class="recommendations-section"></div>
+        </div>
         <div class="main-content">
             <div id="result"></div>
         </div>
-        <div class="sidebar">
+        <div class="sidebar-right">
             <div id="history" class="history-section"></div>
         </div>
     </div>
@@ -91,6 +104,7 @@
         const searchBtn = document.getElementById('search');
         const resultDiv = document.getElementById('result');
         const historyDiv = document.getElementById('history');
+        const recommendationsDiv = document.getElementById('recommendations');
 
         let currentData = null;
         let currentPage = 1;
@@ -138,6 +152,18 @@
                     <div class="parsed-tags">
                         ${tags.map(t => `<span class="parsed-tag">${escapeHtml(t)}</span>`).join('')}
                     </div>
+                </div>
+            `;
+        }
+
+        function renderRecommendations(recommendations) {
+            if (!recommendations || recommendations.length === 0) {
+                return '<div class="recommendations-empty">추천 공고가 없습니다</div>';
+            }
+            return `
+                <h3>추천 공고</h3>
+                <div class="recommendations-list">
+                    ${recommendations.map(renderJobCard).join('')}
                 </div>
             `;
         }
@@ -250,6 +276,7 @@
                     currentData = data;
                     hasMorePages = data.has_more;
                     resultDiv.innerHTML = renderResults(data);
+                    recommendationsDiv.innerHTML = renderRecommendations(data.recommendations);
                     loadHistory();
                 }
             } catch (e) {

@@ -49,6 +49,7 @@ class ExecuteResult(BaseModel):
 
     crawl_results: list[dict] = Field(default_factory=list)
     crawl_error: str | None = None
+    recommendations: list[dict] = Field(default_factory=list)
 
 
 class AgentResponse(BaseModel):
@@ -60,6 +61,7 @@ class AgentResponse(BaseModel):
     search_plan: SearchPlan | None = None
     response: str
     results: list[dict] = Field(default_factory=list)
+    recommendations: list[dict] = Field(default_factory=list)
     total_count: int = 0
     has_more: bool = False
     search_time_ms: int = 0

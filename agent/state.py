@@ -12,5 +12,6 @@ class AgentState(TypedDict):
     search_plan: dict | None
     crawl_results: list[dict] | None
     crawl_error: str | None
+    recommendations: list[dict] | None
     response: str | None
     final_results: list[dict] | None

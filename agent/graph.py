@@ -80,6 +80,7 @@ async def run_agent(
         "search_plan": search_plan,
         "crawl_results": None,
         "crawl_error": None,
+        "recommendations": None,
         "response": None,
         "final_results": None,
     }
@@ -102,6 +103,7 @@ async def run_agent(
         search_plan=SearchPlan(**result_search_plan) if result_search_plan else None,
         response=response,
         results=final_results,
+        recommendations=result.get("recommendations") or [],
         total_count=len(final_results),
         has_more=len(final_results) >= HAS_MORE_THRESHOLD,
         search_time_ms=int(tracker.elapsed_ms),

@@ -3,9 +3,7 @@
 import asyncio
 import logging
 
-from django.conf import settings
-
-from agent.constants import RAG_MIN_RESULTS, SERVER_BUSY_MESSAGE
+from agent.constants import SERVER_BUSY_MESSAGE
 from agent.models import ExecuteResult, SearchPlan
 from agent.state import AgentState
 from agent.tools.rag import RAGTool
@@ -20,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 async def execute_node(state: AgentState) -> dict:
     """
-    RAG 검색 후 결과 부족 시 크롤링 수행.
+    크롤링 수행 및 RAG 추천 (page==1일 때만).
 
     Input: search_plan, page (optional)
-    Output: crawl_results, crawl_error
+    Output: crawl_results, crawl_error, recommendations
     """
     plan = SearchPlan(**state["search_plan"])
     page = state.get("page", 1)
@@ -34,15 +32,17 @@ async def execute_node(state: AgentState) -> dict:
 
     logger.info(f"Executing search: keyword='{plan.search_keyword}', page={page}")
 
-    if page == 1 and settings.DB_SAVE_ENABLED:
-        rag_results = await _search_from_rag(plan.search_keyword, filters)
-        if len(rag_results) >= RAG_MIN_RESULTS:
-            logger.info(f"RAG search sufficient: {len(rag_results)} results")
-            return ExecuteResult(crawl_results=rag_results).model_dump()
-
     try:
         async with asyncio.timeout(CRAWLER_TIMEOUT):
             async with crawler_semaphore:
+                if page == 1:
+                    crawl_task = _execute_crawling(plan.search_keyword, page, filters)
+                    rag_task = _search_from_rag(plan.search_keyword, filters)
+                    crawl_result, recommendations = await asyncio.gather(
+                        crawl_task, rag_task
+                    )
+                    crawl_result["recommendations"] = recommendations
+                    return crawl_result
                 return await _execute_crawling(plan.search_keyword, page, filters)
     except TimeoutError:
         logger.warning("Crawler semaphore timeout - server busy")
